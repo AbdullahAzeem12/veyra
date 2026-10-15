@@ -18,6 +18,13 @@ class DemoStayRepository implements StayRepository {
       Stream.value(_all.where((s) => s.isFeatured && s.isActive).toList());
 
   @override
+  Stream<List<Stay>> streamRecommendedStays() =>
+      Stream.value(sortSearchResults(
+        _all.where((s) => s.isActive).toList(),
+        SortBy.ratingDesc,
+      ));
+
+  @override
   Stream<List<Stay>> searchStays(SearchCriteria criteria) =>
       Stream.value(applySearchFilters(_all, criteria));
 
@@ -106,15 +113,15 @@ class DemoStayRepository implements StayRepository {
   }
 }
 
-/// In-memory saved-stays with SharedPreferences persistence.
+/// In-memory saved-stays with SharedPreferences persistence and proper per-user isolation.
 class DemoSavedRepository implements SavedRepository {
   final _controllers = <String, StreamController<Set<String>>>{};
   final _savedMap = <String, Set<String>>{};
-  bool _loaded = false;
+  final Set<String> _loadedUsers = {};
 
   Future<void> _ensureLoaded(String userId) async {
-    if (_loaded) return;
-    _loaded = true;
+    if (_loadedUsers.contains(userId)) return;
+    _loadedUsers.add(userId);
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getStringList('saved_$userId') ?? [];
     _savedMap[userId] = Set<String>.from(saved);
@@ -156,7 +163,7 @@ class DemoSavedRepository implements SavedRepository {
   }
 }
 
-/// In-memory booking repository.
+/// In-memory booking repository with full add-on and cancellation lifecycle tracking.
 class DemoBookingRepository implements BookingRepository {
   final _bookings = <String, Booking>{};
   final StreamController<List<Booking>> _controller =
@@ -176,7 +183,7 @@ class DemoBookingRepository implements BookingRepository {
 
   @override
   Future<String> createBooking(BookingDraft draft) async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 600));
     final id = 'BK${DateTime.now().millisecondsSinceEpoch}';
     final ref = 'VYR-${Random().nextInt(900000) + 100000}';
     final now = DateTime.now();
@@ -193,6 +200,10 @@ class DemoBookingRepository implements BookingRepository {
       price: draft.price,
       status: BookingStatus.confirmed,
       bookingReference: ref,
+      addOns: draft.addOns,
+      specialRequests: draft.specialRequests,
+      paymentMethodId: draft.paymentMethodId,
+      cancellationPolicy: draft.cancellationPolicy,
       createdAt: now,
       updatedAt: now,
     );
@@ -203,15 +214,34 @@ class DemoBookingRepository implements BookingRepository {
 
   @override
   Future<void> cancelBooking(String bookingId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 400));
     final booking = _bookings[bookingId];
     if (booking == null) return;
     if (!booking.isCancellable) {
       throw Exception('This booking cannot be cancelled.');
     }
-    _bookings[bookingId] =
-        booking.copyWith(status: BookingStatus.cancelled, updatedAt: DateTime.now());
+    final refundAmount = (booking.price.totalCents *
+            (booking.cancellationPolicy.refundPercentage / 100))
+        .round();
+    _bookings[bookingId] = booking.copyWith(
+      status: BookingStatus.cancelled,
+      refundStatus: RefundStatus.pending,
+      refundAmountCents: refundAmount,
+      updatedAt: DateTime.now(),
+    );
     _controller.add(_bookings.values.toList());
+  }
+
+  /// Reconcile refund state (e.g. from payment webhook or backend response)
+  void reconcileRefund(String bookingId) {
+    final booking = _bookings[bookingId];
+    if (booking != null && booking.status == BookingStatus.cancelled) {
+      _bookings[bookingId] = booking.copyWith(
+        refundStatus: RefundStatus.refunded,
+        updatedAt: DateTime.now(),
+      );
+      _controller.add(_bookings.values.toList());
+    }
   }
 
   @override

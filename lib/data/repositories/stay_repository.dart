@@ -5,6 +5,7 @@ import '../models/booking.dart';
 /// Abstract interface for stay data operations.
 abstract class StayRepository {
   Stream<List<Stay>> streamFeaturedStays();
+  Stream<List<Stay>> streamRecommendedStays();
   Stream<List<Stay>> searchStays(SearchCriteria criteria);
   Stream<Stay?> streamStayById(String stayId);
   Stream<List<Stay>> streamDestinationStays(String destinationId);

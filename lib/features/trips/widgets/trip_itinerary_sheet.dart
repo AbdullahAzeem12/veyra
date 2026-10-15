@@ -248,26 +248,44 @@ class TripItinerarySheet extends StatelessWidget {
   void _confirmCancellation(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Cancel Reservation?'),
         content: Text(
-          'Cancel your stay at ${booking.stayTitle}? A full 100% refund of ${booking.price.totalDisplay} will be processed back to your original payment card.',
+          'Cancel your stay at ${booking.stayTitle}?\n\n'
+          'Under the ${booking.cancellationPolicy.policyType}, an estimated refund of '
+          '${booking.price.totalDisplay} (${booking.cancellationPolicy.refundPercentage}%) '
+          'will be requested and processed through your payment provider.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: const Text('Keep Reservation'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context); // close dialog
+            onPressed: () async {
+              Navigator.pop(dialogCtx); // close dialog
               Navigator.pop(context); // close sheet
-              ctrl.cancelBooking(booking.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Reservation ${booking.bookingReference} cancelled. Refund issued.'),
-                ),
-              );
+              final ok = await ctrl.cancelBooking(booking.id);
+              if (context.mounted) {
+                if (ok) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Reservation ${booking.bookingReference} cancellation requested. Refund processing.',
+                      ),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        ctrl.generalError ?? 'Failed to cancel reservation.',
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
             },
             child: Text(
               'Confirm Cancel',

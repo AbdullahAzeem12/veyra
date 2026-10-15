@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/design_tokens.dart';
 import '../../../app.dart';
 import '../../../data/models/stay.dart';
+import '../../../data/models/booking.dart';
 import '../../trips/booking_controller.dart';
 
 // ── 1. All Amenities Modal Sheet ──────────────────────────────────────────────
@@ -210,7 +211,7 @@ class StayReviewsSheet extends StatelessWidget {
                 const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 28),
                 const SizedBox(width: 6),
                 Text(
-                  '${stay.rating} · 128 Verified Reviews',
+                  '${stay.rating} · ${stay.reviewCount} Reviews',
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const Spacer(),
@@ -227,11 +228,11 @@ class StayReviewsSheet extends StatelessWidget {
               padding: const EdgeInsets.all(VeyraTokens.spaceMD),
               children: [
                 // Category breakdown bars
-                _RatingScoreRow(label: 'Cleanliness', score: 4.9),
-                _RatingScoreRow(label: 'Accuracy & Integrity', score: 5.0),
-                _RatingScoreRow(label: 'Concierge Communication', score: 4.9),
-                _RatingScoreRow(label: 'Prime Location', score: 5.0),
-                _RatingScoreRow(label: 'Luxury Value & Service', score: 4.8),
+                _RatingScoreRow(label: 'Cleanliness', score: (stay.rating).clamp(1.0, 5.0)),
+                _RatingScoreRow(label: 'Accuracy & Integrity', score: ((stay.rating + 0.1).clamp(1.0, 5.0))),
+                _RatingScoreRow(label: 'Concierge Communication', score: (stay.rating).clamp(1.0, 5.0)),
+                _RatingScoreRow(label: 'Prime Location', score: ((stay.rating + 0.1).clamp(1.0, 5.0))),
+                _RatingScoreRow(label: 'Luxury Value & Service', score: ((stay.rating - 0.1).clamp(1.0, 5.0))),
 
                 const SizedBox(height: VeyraTokens.spaceLG),
                 const Divider(),
@@ -610,7 +611,10 @@ class _MultiStepBookingSheetState extends State<MultiStepBookingSheet> {
                   ),
                 ] else ...[
                   // Step 3: Confirmed View
-                  _ConfirmedSuccessView(stay: widget.stay),
+                  _ConfirmedSuccessView(
+                    stay: widget.stay,
+                    booking: widget.bookingCtrl.confirmedBooking,
+                  ),
                 ],
               ],
             ),
@@ -634,7 +638,7 @@ class _MultiStepBookingSheetState extends State<MultiStepBookingSheet> {
                       Text(
                         grandTotalDisplay,
                         style: VeyraTokens.headlineMedium.copyWith(
-                          color: scheme.primary,
+                           color: scheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -662,9 +666,38 @@ class _MultiStepBookingSheetState extends State<MultiStepBookingSheet> {
                       } else if (_currentStep == 1) {
                         setState(() => _currentStep = 2);
                       } else if (_currentStep == 2) {
-                        // Submit booking
-                        await widget.bookingCtrl.submitBooking(widget.stay, 'guest');
-                        setState(() => _currentStep = 3);
+                        // Submit booking with structured add-ons and special requests
+                        final addOns = <BookingAddOn>[];
+                        if (_helicopterTransfer) addOns.add(BookingAddOn.helicopter);
+                        if (_vintageChampagne) addOns.add(BookingAddOn.champagne);
+                        if (_dedicatedButler) addOns.add(BookingAddOn.butler);
+                        if (_sunsetYacht) addOns.add(BookingAddOn.yacht);
+
+                        final ok = await widget.bookingCtrl.submitBooking(
+                          widget.stay,
+                          profileCtrl?.email.isNotEmpty == true ? 'alexander_wright' : 'guest',
+                          addOns: addOns,
+                          specialRequests: _specialRequestsCtrl.text.trim().isNotEmpty
+                              ? _specialRequestsCtrl.text.trim()
+                              : null,
+                          paymentMethodId: profileCtrl?.defaultCard?.id,
+                        );
+
+                        if (ok) {
+                          setState(() => _currentStep = 3);
+                        } else {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  widget.bookingCtrl.generalError ??
+                                      'Failed to complete reservation. Please try again.',
+                                ),
+                                backgroundColor: Theme.of(context).colorScheme.error,
+                              ),
+                            );
+                          }
+                        }
                       }
                     },
                     child: Text(
@@ -686,12 +719,14 @@ class _MultiStepBookingSheetState extends State<MultiStepBookingSheet> {
 
 class _ConfirmedSuccessView extends StatelessWidget {
   final Stay stay;
-  const _ConfirmedSuccessView({required this.stay});
+  final Booking? booking;
+  const _ConfirmedSuccessView({required this.stay, this.booking});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final code = 'VYR-${(DateTime.now().millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
+    final code = booking?.bookingReference ?? 'VYR-CONFIRMED';
+    final hasAddOns = booking != null && booking!.addOns.isNotEmpty;
 
     return Column(
       children: [
@@ -717,10 +752,25 @@ class _ConfirmedSuccessView extends StatelessWidget {
         const SizedBox(height: VeyraTokens.spaceMD),
         Text(
           'Your sanctuary reservation at ${stay.title} has been logged. '
-          'Your dedicated concierge has confirmed all bespoke add-ons.',
+          '${hasAddOns ? "Your dedicated concierge has confirmed your ${booking!.addOns.length} bespoke add-on(s)." : "All reservation details are synced with VIP Front Desk."}',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
+        if (hasAddOns) ...[
+          const SizedBox(height: VeyraTokens.spaceMD),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: booking!.addOns
+                .map((a) => Chip(
+                      avatar: const Icon(Icons.check_circle_rounded, size: 16, color: VeyraTokens.deepEmerald),
+                      label: Text(a.title, style: const TextStyle(fontSize: 12)),
+                      backgroundColor: scheme.primaryContainer.withValues(alpha: 0.3),
+                    ))
+                .toList(),
+          ),
+        ],
         const SizedBox(height: VeyraTokens.space2XL),
         FilledButton.icon(
           style: FilledButton.styleFrom(

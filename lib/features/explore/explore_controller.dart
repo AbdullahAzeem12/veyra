@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/stay.dart';
 import '../../data/models/search_criteria.dart';
 import '../../data/repositories/stay_repository.dart';
-import '../../data/repositories/demo_repository.dart';
-import '../../data/demo/demo_data.dart';
 
 enum LoadState { idle, loading, loaded, error }
 
@@ -19,24 +17,52 @@ class ExploreController extends ChangeNotifier {
   List<Stay> _recommended = [];
   String _selectedCategory = 'All';
   String? _errorMessage;
-  StreamSubscription<List<Stay>>? _sub;
+  StreamSubscription<List<Stay>>? _featuredSub;
+  StreamSubscription<List<Stay>>? _recommendedSub;
 
   LoadState get state => _state;
   List<Stay> get featured => _featured;
   List<Stay> get recommended => _recommended;
   String get selectedCategory => _selectedCategory;
   String? get errorMessage => _errorMessage;
-  List<String> get categories => DemoData.categories;
+
+  static const List<String> defaultCategories = [
+    'All',
+    'Villa',
+    'Château',
+    'Island',
+    'Overwater',
+    'Chalet',
+  ];
+
+  List<String> get categories => defaultCategories;
 
   Future<void> load() async {
     _state = LoadState.loading;
     _errorMessage = null;
     notifyListeners();
-    await _sub?.cancel();
-    _sub = _stayRepo.streamFeaturedStays().listen(
+
+    await _featuredSub?.cancel();
+    await _recommendedSub?.cancel();
+
+    _featuredSub = _stayRepo.streamFeaturedStays().listen(
       (stays) {
         _featured = stays;
-        _recommended = _buildRecommended(stays);
+        if (_recommended.isNotEmpty) {
+          _state = LoadState.loaded;
+        }
+        notifyListeners();
+      },
+      onError: (Object e) {
+        _errorMessage = e.toString();
+        _state = LoadState.error;
+        notifyListeners();
+      },
+    );
+
+    _recommendedSub = _stayRepo.streamRecommendedStays().listen(
+      (stays) {
+        _recommended = stays;
         _state = LoadState.loaded;
         notifyListeners();
       },
@@ -58,16 +84,12 @@ class ExploreController extends ChangeNotifier {
     return _recommended.where((s) => s.category == _selectedCategory).toList();
   }
 
-  List<Stay> _buildRecommended(List<Stay> featured) {
-    final all = DemoData.allStays;
-    return DemoStayRepository.sortSearchResults(all, SortBy.ratingDesc);
-  }
-
   Future<void> refresh() async => load();
 
   @override
   Future<void> dispose() async {
-    await _sub?.cancel();
+    await _featuredSub?.cancel();
+    await _recommendedSub?.cancel();
     super.dispose();
   }
 }
