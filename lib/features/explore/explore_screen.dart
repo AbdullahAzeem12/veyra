@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/widgets/shared_widgets.dart';
 import '../../core/widgets/stay_card.dart';
@@ -7,6 +8,7 @@ import '../../core/widgets/fade_pop_item.dart';
 import '../../core/localization/app_translations.dart';
 import '../../core/responsive/adaptive_scaffold.dart';
 import '../../data/models/stay.dart';
+import '../../data/demo/demo_data.dart';
 import '../../core/navigation/app_router.dart';
 import '../../app.dart';
 import 'explore_controller.dart';
@@ -73,6 +75,7 @@ class _ExploreBody extends StatelessWidget {
         slivers: [
           _ExploreHeader(ctrl: ctrl),
           _CategorySection(ctrl: ctrl),
+          const _CuratedDestinationsSection(),
           _FeaturedSection(stays: ctrl.featured, ctrl: ctrl),
           _RecommendedSection(stays: ctrl.filteredRecommended, ctrl: ctrl),
           const SliverToBoxAdapter(
@@ -240,12 +243,9 @@ class _GreetingText extends StatelessWidget {
 class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
-        boxShadow: VeyraTokens.shadowMD,
-      ),
+    return VeyraGlassSurface(
+      preset: VeyraGlassPreset.floating,
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
       child: Row(
         children: [
           Expanded(
@@ -263,13 +263,13 @@ class _SearchBar extends StatelessWidget {
                 child: Row(
                   children: [
                     const Icon(Icons.search_rounded,
-                        color: VeyraTokens.deepEmerald, size: 22),
+                        color: VeyraTokens.antiqueGold, size: 22),
                     const SizedBox(width: VeyraTokens.spaceSM),
                     Expanded(
                       child: Text(
                         AppTranslations.tr(context, 'search_hint'),
                         style: VeyraTokens.bodyMedium.copyWith(
-                          color: VeyraTokens.lightSubtext,
+                          color: Colors.white.withValues(alpha: 0.9),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -279,22 +279,25 @@ class _SearchBar extends StatelessWidget {
               ),
             ),
           ),
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
+          VeyraPressable(
             onTap: () {
-              HapticFeedback.lightImpact();
               StayFiltersBottomSheet.show(context, navigateToSearchOnApply: true);
             },
+            borderRadius: BorderRadius.circular(VeyraTokens.radiusSM),
             child: Padding(
               padding: const EdgeInsets.only(right: VeyraTokens.spaceSM),
               child: Container(
                 padding: const EdgeInsets.all(VeyraTokens.spaceXS + 2),
                 decoration: BoxDecoration(
-                  color: VeyraTokens.deepEmerald.withValues(alpha: 0.1),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(VeyraTokens.radiusSM),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 0.8,
+                  ),
                 ),
                 child: const Icon(Icons.tune_rounded,
-                    color: VeyraTokens.deepEmerald, size: 20),
+                    color: Colors.white, size: 20),
               ),
             ),
           ),
@@ -357,28 +360,170 @@ class _CategoryChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return VeyraPressable(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
       child: AnimatedContainer(
         duration: VeyraTokens.durationFast,
         padding: const EdgeInsets.symmetric(
           horizontal: VeyraTokens.spaceMD,
-          vertical: VeyraTokens.spaceXS,
+          vertical: VeyraTokens.spaceXS + 1,
         ),
         decoration: BoxDecoration(
-          color: selected ? scheme.primary : scheme.surface,
+          color: selected
+              ? scheme.primary
+              : (isDark ? VeyraTokens.darkCardSurface : Colors.white),
           borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
           border: Border.all(
-            color: selected ? scheme.primary : scheme.outline,
+            color: selected
+                ? scheme.primary
+                : (isDark ? VeyraTokens.darkBorder : VeyraTokens.lightBorder),
+            width: selected ? 1.5 : 1.0,
           ),
-          boxShadow: selected ? VeyraTokens.shadowSM : null,
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : VeyraTokens.shadowSM,
         ),
         child: Text(
           label,
           style: VeyraTokens.labelSmall.copyWith(
             color: selected ? scheme.onPrimary : scheme.onSurface,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CuratedDestinationsSection extends StatelessWidget {
+  const _CuratedDestinationsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final destinations = DemoData.destinations;
+
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: VeyraTokens.spaceMD),
+          _SectionHeader(
+            title: 'Curated Destinations',
+            onSeeAll: () => navigateToSearch(context),
+          ),
+          const SizedBox(height: VeyraTokens.spaceSM),
+          SizedBox(
+            height: 140,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
+              scrollDirection: Axis.horizontal,
+              itemCount: destinations.length,
+              separatorBuilder: (_, __) => const SizedBox(width: VeyraTokens.spaceSM + 4),
+              itemBuilder: (context, i) {
+                final dest = destinations[i];
+                final name = dest['name'] as String? ?? '';
+                final country = dest['country'] as String? ?? '';
+                final imageUrl = dest['imageUrl'] as String? ?? '';
+                final stayCount = dest['stayCount'] as int? ?? 12;
+
+                return FadePopItem(
+                  index: i,
+                  child: VeyraPressable(
+                    onTap: () {
+                      final searchCtrl = AppScope.searchCtrlOf(context);
+                      searchCtrl?.updateQuery(name);
+                      AppShell.switchTab(context, 1);
+                    },
+                    borderRadius: BorderRadius.circular(VeyraTokens.radiusLG),
+                    child: Container(
+                      width: 170,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(VeyraTokens.radiusLG),
+                        boxShadow: VeyraTokens.shadowSM,
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const ShimmerSkeleton(
+                              borderRadius: BorderRadius.zero,
+                            ),
+                            errorWidget: (_, __, ___) => Container(color: Colors.grey.shade400),
+                          ),
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black.withValues(alpha: 0.65),
+                                  ],
+                                  stops: const [0.4, 1.0],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: VeyraTokens.spaceSM,
+                            right: VeyraTokens.spaceSM,
+                            bottom: VeyraTokens.spaceSM,
+                            child: VeyraGlassSurface(
+                              preset: VeyraGlassPreset.subtle,
+                              borderRadius: BorderRadius.circular(VeyraTokens.radiusSM),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: VeyraTokens.spaceSM,
+                                vertical: 4,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    name,
+                                    style: VeyraTokens.labelLarge.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '$country · $stayCount stays',
+                                    style: VeyraTokens.bodySmall.copyWith(
+                                      color: Colors.white.withValues(alpha: 0.85),
+                                      fontSize: 9.5,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

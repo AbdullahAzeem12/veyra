@@ -68,13 +68,22 @@ class _CardContainerState extends State<_CardContainer> {
   @override
   Widget build(BuildContext context) {
     final shadows = widget.showPremiumDepth
-        ? VeyraTokens.shadowLG
+        ? [
+            ...VeyraTokens.shadowLG,
+            BoxShadow(
+              color: VeyraTokens.deepEmerald.withValues(alpha: widget.isDark ? 0.35 : 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ]
         : VeyraTokens.shadowMD;
 
     Widget card = AnimatedContainer(
-      duration: VeyraTokens.durationFast,
-      transform: widget.showPremiumDepth && _pressed
-          ? Matrix4.diagonal3Values(0.97, 0.97, 1.0)
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      transform: _pressed
+          ? (Matrix4.diagonal3Values(0.975, 0.975, 1.0)
+            ..setTranslationRaw(0, 2, 0))
           : Matrix4.identity(),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(VeyraTokens.radiusXL),
@@ -82,17 +91,21 @@ class _CardContainerState extends State<_CardContainer> {
         color: widget.isDark
             ? VeyraTokens.darkCardSurface
             : VeyraTokens.lightSurface,
+        border: Border.all(
+          color: widget.isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : VeyraTokens.lightBorder,
+          width: 0.8,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: widget.child,
     );
 
-    if (!widget.showPremiumDepth) return card;
-
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
+    return Listener(
+      onPointerDown: (_) => setState(() => _pressed = true),
+      onPointerUp: (_) => setState(() => _pressed = false),
+      onPointerCancel: (_) => setState(() => _pressed = false),
       child: card,
     );
   }
@@ -220,18 +233,20 @@ class _CardImage extends StatelessWidget {
         Positioned(
           top: VeyraTokens.spaceSM,
           left: VeyraTokens.spaceSM,
-          child: Container(
+          child: VeyraGlassSurface(
+            preset: VeyraGlassPreset.subtle,
+            borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
             padding: const EdgeInsets.symmetric(
-              horizontal: VeyraTokens.spaceSM,
-              vertical: 3,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+              horizontal: VeyraTokens.spaceSM + 2,
+              vertical: 3.5,
             ),
             child: Text(
               stay.category,
-              style: VeyraTokens.labelSmall.copyWith(color: Colors.white),
+              style: VeyraTokens.labelSmall.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ),
@@ -360,8 +375,9 @@ class FeaturedStayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return VeyraPressable(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusXL),
       child: Container(
         width: 280,
         margin: const EdgeInsets.only(right: VeyraTokens.spaceMD),
@@ -401,18 +417,18 @@ class FeaturedStayCard extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withValues(alpha: 0.75),
+                      Colors.black.withValues(alpha: 0.65),
                     ],
                     stops: const [0.4, 1.0],
                   ),
                 ),
               ),
             ),
-            // Info overlay
+            // Info overlay with liquid glass morphism
             Positioned(
-              left: VeyraTokens.spaceMD,
-              right: VeyraTokens.spaceMD,
-              bottom: VeyraTokens.spaceMD,
+              left: VeyraTokens.spaceSM,
+              right: VeyraTokens.spaceSM,
+              bottom: VeyraTokens.spaceSM,
               child: _FeaturedCardInfo(stay: stay),
             ),
             // Favourite
@@ -438,54 +454,67 @@ class _FeaturedCardInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '${stay.destination}, ${stay.country}',
-          style: VeyraTokens.labelSmall.copyWith(
-            color: Colors.white.withValues(alpha: 0.8),
+    return VeyraGlassSurface(
+      preset: VeyraGlassPreset.floating,
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+      padding: const EdgeInsets.symmetric(
+        horizontal: VeyraTokens.spaceMD - 2,
+        vertical: VeyraTokens.spaceSM,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${stay.destination}, ${stay.country}',
+            style: VeyraTokens.labelSmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.85),
+              letterSpacing: 0.2,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 2),
-        Text(
-          stay.title,
-          style: VeyraTokens.headlineMedium.copyWith(color: Colors.white),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: VeyraTokens.spaceXS),
-        Row(
-          children: [
-            RatingBadge(rating: stay.rating, dark: true),
-            const Spacer(),
-            Builder(
-              builder: (context) {
-                final currencyCtrl = AppScope.currencyCtrlOf(context);
-                final priceStr = currencyCtrl != null
-                    ? currencyCtrl.formatCents(stay.nightlyPriceCents)
-                    : stay.nightlyPriceDisplay;
-                return Text(
-                  priceStr,
-                  style: VeyraTokens.labelLarge.copyWith(
-                    color: VeyraTokens.antiqueGold,
-                  ),
-                );
-              },
+          const SizedBox(height: 2),
+          Text(
+            stay.title,
+            style: VeyraTokens.headlineMedium.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
-            Text(
-              '/night',
-              style: VeyraTokens.bodySmall.copyWith(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 10,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: VeyraTokens.spaceXS),
+          Row(
+            children: [
+              RatingBadge(rating: stay.rating, dark: true),
+              const Spacer(),
+              Builder(
+                builder: (context) {
+                  final currencyCtrl = AppScope.currencyCtrlOf(context);
+                  final priceStr = currencyCtrl != null
+                      ? currencyCtrl.formatCents(stay.nightlyPriceCents)
+                      : stay.nightlyPriceDisplay;
+                  return Text(
+                    priceStr,
+                    style: VeyraTokens.labelLarge.copyWith(
+                      color: VeyraTokens.antiqueGold,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  );
+                },
               ),
-            ),
-          ],
-        ),
-      ],
+              Text(
+                '/night',
+                style: VeyraTokens.bodySmall.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

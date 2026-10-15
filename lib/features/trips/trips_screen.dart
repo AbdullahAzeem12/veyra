@@ -40,7 +40,7 @@ class _TripsBodyState extends State<_TripsBody>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -64,13 +64,19 @@ class _TripsBodyState extends State<_TripsBody>
                   _TripsList(
                     bookings: widget.ctrl.upcomingBookings,
                     emptyTitle: 'No upcoming trips',
-                    emptySubtitle: 'Book a stay to see it here.',
+                    emptySubtitle: 'Book a luxury stay to see your confirmed reservation here.',
                     ctrl: widget.ctrl,
                   ),
                   _TripsList(
                     bookings: widget.ctrl.pastBookings,
                     emptyTitle: 'No past trips',
-                    emptySubtitle: 'Your completed trips will appear here.',
+                    emptySubtitle: 'Your completed journeys and stays will appear here.',
+                    ctrl: widget.ctrl,
+                  ),
+                  _TripsList(
+                    bookings: widget.ctrl.cancelledBookings,
+                    emptyTitle: 'No cancelled trips',
+                    emptySubtitle: 'Any cancelled reservations and refund statuses are tracked here.',
                     ctrl: widget.ctrl,
                   ),
                 ],
@@ -132,7 +138,8 @@ class _TripsTabs extends StatelessWidget {
       labelColor: Theme.of(context).colorScheme.primary,
       tabs: const [
         Tab(text: 'Upcoming'),
-        Tab(text: 'Past'),
+        Tab(text: 'Completed'),
+        Tab(text: 'Cancelled'),
       ],
     );
   }
@@ -159,7 +166,7 @@ class _TripsList extends StatelessWidget {
         title: emptyTitle,
         subtitle: emptySubtitle,
         actionLabel: 'Explore Stays',
-        onAction: () => Navigator.of(context).popUntil((r) => r.isFirst),
+        onAction: () => AppShell.switchTab(context, 0),
       );
     }
     return ListView.builder(
@@ -179,30 +186,28 @@ class _TripCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(bottom: VeyraTokens.spaceMD),
-      decoration: BoxDecoration(
-        color: isDark ? VeyraTokens.darkCardSurface : VeyraTokens.lightSurface,
-        borderRadius: BorderRadius.circular(VeyraTokens.radiusXL),
-        border: Border.all(
-          color: isDark ? VeyraTokens.darkBorder : VeyraTokens.lightBorder,
-        ),
-        boxShadow: VeyraTokens.shadowSM,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return VeyraPressable(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        TripItinerarySheet.show(context, booking, ctrl);
+      },
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusXL),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: VeyraTokens.spaceMD),
+        decoration: BoxDecoration(
+          color: isDark ? VeyraTokens.darkCardSurface : VeyraTokens.lightSurface,
           borderRadius: BorderRadius.circular(VeyraTokens.radiusXL),
-          onTap: () {
-            HapticFeedback.lightImpact();
-            TripItinerarySheet.show(context, booking, ctrl);
-          },
-          child: Column(
-            children: [
-              _TripCardImage(booking: booking),
-              _TripCardDetails(booking: booking, ctrl: ctrl),
-            ],
+          border: Border.all(
+            color: isDark ? VeyraTokens.darkBorder : VeyraTokens.lightBorder,
           ),
+          boxShadow: VeyraTokens.shadowSM,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            _TripCardImage(booking: booking),
+            _TripCardDetails(booking: booking, ctrl: ctrl),
+          ],
         ),
       ),
     );
@@ -339,44 +344,51 @@ class _TripCardHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: VeyraTokens.spaceSM),
-        _StatusBadge(status: booking.status),
+        _StatusBadge(booking: booking),
       ],
     );
   }
 }
 
 class _StatusBadge extends StatelessWidget {
-  final BookingStatus status;
-  const _StatusBadge({required this.status});
+  final Booking booking;
+  const _StatusBadge({required this.booking});
 
   @override
   Widget build(BuildContext context) {
     Color color;
-    switch (status) {
+    String label = booking.status.name.toUpperCase();
+    switch (booking.status) {
       case BookingStatus.confirmed:
-        color = Colors.green;
+        color = const Color(0xFF2E7D5E);
       case BookingStatus.pending:
-        color = Colors.orange;
+        color = const Color(0xFFCB8B3A);
       case BookingStatus.cancelled:
-        color = Colors.red;
+        color = const Color(0xFFB5373A);
+        if (booking.refundStatus == RefundStatus.pending) {
+          label = 'CANCELLED · REFUND PENDING';
+          color = const Color(0xFFCB8B3A);
+        } else if (booking.refundStatus == RefundStatus.refunded) {
+          label = 'CANCELLED · REFUNDED';
+          color = const Color(0xFF2B6CB0);
+        }
       case BookingStatus.completed:
         color = Colors.blueGrey;
     }
-    return Container(
+    return VeyraGlassSurface(
+      preset: VeyraGlassPreset.subtle,
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
       padding: const EdgeInsets.symmetric(
         horizontal: VeyraTokens.spaceSM,
-        vertical: 2,
-      ),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+        vertical: 3,
       ),
       child: Text(
-        status.name.toUpperCase(),
+        label,
         style: VeyraTokens.labelSmall.copyWith(
           color: color,
-          fontSize: 10,
+          fontSize: 9.5,
           fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
         ),
       ),
     );

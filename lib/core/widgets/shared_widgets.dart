@@ -4,8 +4,191 @@ import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../core/theme/design_tokens.dart';
 
-/// Glass-morphism panel using BackdropFilter + ClipRRect.
-/// Use sparingly — blur is GPU-intensive in scrolling lists.
+/// Preset configurations for liquid glass-morphism surfaces.
+enum VeyraGlassPreset {
+  subtle,
+  standard,
+  floating,
+  navigation,
+  modal,
+  premium,
+}
+
+/// State-of-the-art Liquid Glassmorphism Surface for Veyra.
+/// Features optical backdrop blur, specular refraction top rim highlight,
+/// dual-layer border reflections, and physical ambient depth.
+class VeyraGlassSurface extends StatelessWidget {
+  final Widget child;
+  final VeyraGlassPreset preset;
+  final double? blur;
+  final double? opacity;
+  final BorderRadius? borderRadius;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
+  final BoxBorder? border;
+  final Color? tintColor;
+  final List<BoxShadow>? boxShadow;
+  final bool showLightRim;
+  final Clip clipBehavior;
+
+  const VeyraGlassSurface({
+    super.key,
+    required this.child,
+    this.preset = VeyraGlassPreset.standard,
+    this.blur,
+    this.opacity,
+    this.borderRadius,
+    this.padding,
+    this.margin,
+    this.border,
+    this.tintColor,
+    this.boxShadow,
+    this.showLightRim = true,
+    this.clipBehavior = Clip.antiAlias,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final radius = borderRadius ?? BorderRadius.circular(VeyraTokens.radiusLG);
+
+    // Derive preset values
+    final (presetBlur, presetOpacity, defaultShadow) = switch (preset) {
+      VeyraGlassPreset.subtle => (8.0, isDark ? 0.08 : 0.12, <BoxShadow>[]),
+      VeyraGlassPreset.standard => (
+          16.0,
+          isDark ? 0.14 : 0.22,
+          isDark
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : VeyraTokens.shadowSM
+        ),
+      VeyraGlassPreset.floating => (
+          20.0,
+          isDark ? 0.18 : 0.32,
+          isDark
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  )
+                ]
+              : VeyraTokens.shadowMD
+        ),
+      VeyraGlassPreset.navigation => (
+          24.0,
+          isDark ? 0.25 : 0.45,
+          [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, -4),
+            )
+          ]
+        ),
+      VeyraGlassPreset.modal => (
+          28.0,
+          isDark ? 0.28 : 0.50,
+          VeyraTokens.shadowLG
+        ),
+      VeyraGlassPreset.premium => (
+          22.0,
+          isDark ? 0.20 : 0.35,
+          [
+            BoxShadow(
+              color: VeyraTokens.antiqueGold.withValues(alpha: isDark ? 0.18 : 0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.10),
+              blurRadius: 12,
+              offset: const Offset(0, 2),
+            )
+          ]
+        ),
+    };
+
+    final effectiveBlur = blur ?? presetBlur;
+    final effectiveOpacity = opacity ?? presetOpacity;
+    final shadows = boxShadow ?? defaultShadow;
+
+    // Optical glass border
+    final BoxBorder effectiveBorder = border ??
+        Border.all(
+          color: isDark
+              ? (preset == VeyraGlassPreset.premium
+                  ? VeyraTokens.antiqueGold.withValues(alpha: 0.25)
+                  : Colors.white.withValues(alpha: 0.12))
+              : (preset == VeyraGlassPreset.premium
+                  ? VeyraTokens.antiqueGold.withValues(alpha: 0.35)
+                  : Colors.white.withValues(alpha: 0.65)),
+          width: 1.0,
+        );
+
+    // Liquid glass gradient tint
+    final baseTint = tintColor ??
+        (isDark
+            ? (preset == VeyraGlassPreset.premium
+                ? const Color(0xFF1E2D2A)
+                : const Color(0xFF1A2624))
+            : (preset == VeyraGlassPreset.premium
+                ? const Color(0xFFFAF7F0)
+                : Colors.white));
+
+    Widget content = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        color: baseTint.withValues(alpha: effectiveOpacity),
+        border: effectiveBorder,
+        gradient: showLightRim
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: isDark
+                    ? [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.12),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.40),
+                        Colors.white.withValues(alpha: 0.10),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                stops: const [0.0, 0.4, 1.0],
+              )
+            : null,
+      ),
+      child: child,
+    );
+
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: shadows.isNotEmpty ? shadows : null,
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        clipBehavior: clipBehavior,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: effectiveBlur, sigmaY: effectiveBlur),
+          child: content,
+        ),
+      ),
+    );
+  }
+}
+
+/// Backwards-compatible glass panel delegating to [VeyraGlassSurface].
 class GlassPanel extends StatelessWidget {
   final Widget child;
   final double blur;
@@ -16,36 +199,120 @@ class GlassPanel extends StatelessWidget {
   const GlassPanel({
     super.key,
     required this.child,
-    this.blur = 12,
-    this.opacity = 0.12,
+    this.blur = 16,
+    this.opacity = 0.16,
     this.borderRadius,
     this.padding,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final radius = borderRadius ?? BorderRadius.circular(VeyraTokens.radiusLG);
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            color: isDark
-                ? Colors.white.withValues(alpha: opacity * 0.6)
-                : Colors.white.withValues(alpha: (opacity * 1.8).clamp(0.0, 1.0)),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.1)
-                  : Colors.white.withValues(alpha: 0.5),
-              width: 1,
-            ),
-          ),
+    return VeyraGlassSurface(
+      blur: blur,
+      opacity: opacity,
+      borderRadius: borderRadius,
+      padding: padding,
+      preset: VeyraGlassPreset.standard,
+      child: child,
+    );
+  }
+}
+
+/// Interactive physical pressable container with spring physics,
+/// rapid bounce-back response, and subtle haptic feedback.
+class VeyraPressable extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  final double scaleDown;
+  final Duration duration;
+  final bool enableHaptics;
+  final BorderRadius? borderRadius;
+
+  const VeyraPressable({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+    this.scaleDown = 0.965,
+    this.duration = const Duration(milliseconds: 140),
+    this.enableHaptics = true,
+    this.borderRadius,
+  });
+
+  @override
+  State<VeyraPressable> createState() => _VeyraPressableState();
+}
+
+class _VeyraPressableState extends State<VeyraPressable>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animCtrl;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+      reverseDuration: const Duration(milliseconds: 220),
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: widget.scaleDown,
+    ).animate(
+      CurvedAnimation(
+        parent: _animCtrl,
+        curve: Curves.easeInOutCubic,
+        reverseCurve: Curves.easeOutBack,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    if (widget.onTap != null || widget.onLongPress != null) {
+      _animCtrl.forward();
+    }
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    _animCtrl.reverse();
+    if (widget.enableHaptics) {
+      HapticFeedback.lightImpact();
+    }
+    widget.onTap?.call();
+  }
+
+  void _onTapCancel() {
+    _animCtrl.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      onLongPress: widget.onLongPress != null
+          ? () {
+              if (widget.enableHaptics) HapticFeedback.mediumImpact();
+              widget.onLongPress?.call();
+            }
+          : null,
+      child: AnimatedBuilder(
+        animation: _scaleAnimation,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnimation.value,
           child: child,
         ),
+        child: widget.child,
       ),
     );
   }

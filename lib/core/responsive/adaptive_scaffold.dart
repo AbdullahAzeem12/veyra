@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/shared_widgets.dart';
 
 /// Responsive breakpoint helpers.
 class Breakpoints {
@@ -82,26 +84,129 @@ class _VeyraBottomNav extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? VeyraTokens.darkSurface : VeyraTokens.lightSurface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        VeyraTokens.spaceMD,
+        0,
+        VeyraTokens.spaceMD,
+        VeyraTokens.spaceSM,
       ),
       child: SafeArea(
         top: false,
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: onTap,
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          indicatorColor: scheme.primary.withValues(alpha: 0.12),
-          destinations: destinations,
+        child: VeyraGlassSurface(
+          preset: VeyraGlassPreset.navigation,
+          borderRadius: BorderRadius.circular(VeyraTokens.radiusXL),
+          padding: const EdgeInsets.symmetric(
+            horizontal: VeyraTokens.spaceXS,
+            vertical: 6,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(destinations.length, (i) {
+              final d = destinations[i];
+              final isSelected = i == selectedIndex;
+              return Expanded(
+                child: _NavTabItem(
+                  destination: d,
+                  isSelected: isSelected,
+                  isDark: isDark,
+                  primaryColor: scheme.primary,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onTap(i);
+                  },
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavTabItem extends StatelessWidget {
+  final NavigationDestination destination;
+  final bool isSelected;
+  final bool isDark;
+  final Color primaryColor;
+  final VoidCallback onTap;
+
+  const _NavTabItem({
+    required this.destination,
+    required this.isSelected,
+    required this.isDark,
+    required this.primaryColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = primaryColor;
+    final inactiveColor = isDark
+        ? VeyraTokens.darkSubtext
+        : VeyraTokens.lightSubtext;
+
+    IconData iconData = Icons.circle;
+    if (destination.icon is Icon) {
+      iconData = (destination.icon as Icon).icon ?? Icons.circle;
+    }
+    if (isSelected && destination.selectedIcon is Icon) {
+      iconData = (destination.selectedIcon as Icon).icon ?? iconData;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? activeColor.withValues(alpha: isDark ? 0.20 : 0.10)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(VeyraTokens.radiusLG),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedScale(
+              scale: isSelected ? 1.15 : 1.0,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              child: Icon(
+                iconData,
+                color: isSelected ? activeColor : inactiveColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 3),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: VeyraTokens.labelSmall.copyWith(
+                color: isSelected ? activeColor : inactiveColor,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 10.5,
+              ),
+              child: Text(
+                destination.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              width: isSelected ? 16 : 0,
+              height: 2.5,
+              decoration: BoxDecoration(
+                color: isSelected ? VeyraTokens.antiqueGold : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
         ),
       ),
     );

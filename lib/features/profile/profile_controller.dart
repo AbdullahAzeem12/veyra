@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../../core/storage/veyra_storage_service.dart';
 
+import '../../data/models/points_ledger.dart';
+export '../../data/models/points_ledger.dart';
+
 class PaymentCard {
   final String id;
   final String brand; // 'Mastercard', 'Visa', 'Amex'
@@ -30,22 +33,6 @@ class PaymentCard {
   }
 }
 
-class RewardVoucher {
-  final String id;
-  final String title;
-  final String code;
-  final int pointsSpent;
-  final DateTime redeemedAt;
-
-  const RewardVoucher({
-    required this.id,
-    required this.title,
-    required this.code,
-    required this.pointsSpent,
-    required this.redeemedAt,
-  });
-}
-
 class DeviceSession {
   final String id;
   final String deviceName;
@@ -60,6 +47,24 @@ class DeviceSession {
     required this.lastActive,
     this.isCurrent = false,
   });
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'deviceName': deviceName,
+        'location': location,
+        'lastActive': lastActive,
+        'isCurrent': isCurrent,
+      };
+
+  factory DeviceSession.fromJson(Map<String, dynamic> json) {
+    return DeviceSession(
+      id: json['id'] as String? ?? 'session_${DateTime.now().millisecondsSinceEpoch}',
+      deviceName: json['deviceName'] as String? ?? 'Device',
+      location: json['location'] as String? ?? 'Unknown Location',
+      lastActive: json['lastActive'] as String? ?? 'Recently',
+      isCurrent: json['isCurrent'] as bool? ?? false,
+    );
+  }
 }
 
 class UserProfileController extends ChangeNotifier {
@@ -67,8 +72,7 @@ class UserProfileController extends ChangeNotifier {
   final String _email = 'alexander.wright@veyra.travel';
   String _avatarUrl =
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
-  int _points = 4250;
-  final String _tier = 'Veyra Black Tier';
+  int _points = 24850;
 
   // Language
   String _language = 'English (US)';
@@ -107,7 +111,7 @@ class UserProfileController extends ChangeNotifier {
   ];
 
   // Active Device Sessions
-  final List<DeviceSession> _sessions = [
+  List<DeviceSession> _sessions = [
     const DeviceSession(
       id: 'session_1',
       deviceName: 'iPhone 16 Pro Max',
@@ -132,7 +136,10 @@ class UserProfileController extends ChangeNotifier {
   ];
 
   // Redeemed Vouchers
-  final List<RewardVoucher> _vouchers = [];
+  List<RewardVoucher> _vouchers = [];
+
+  // Auditable Points Ledger
+  List<PointsTransaction> _pointsLedger = [];
 
   UserProfileController() {
     loadFromStorage();
@@ -153,6 +160,55 @@ class UserProfileController extends ChangeNotifier {
     _twoFactorEnabled = VeyraStorageService.getTwoFactorEnabled(fallback: _twoFactorEnabled);
     _points = VeyraStorageService.getPoints(fallback: _points);
 
+    // Load ledger
+    final storedLedger = VeyraStorageService.getPointsLedger();
+    if (storedLedger != null && storedLedger.isNotEmpty) {
+      _pointsLedger = storedLedger.map((m) => PointsTransaction.fromJson(m)).toList();
+    } else {
+      // Seed initial ledger transactions reflecting member history
+      _pointsLedger = [
+        PointsTransaction(
+          id: 'tx_seed_1',
+          type: PointsTransactionType.earned,
+          pointsDelta: 12500,
+          title: 'Aman Tokyo Penthouse Stay',
+          description: 'Completed 5-night stay · 5x Points Multiplier',
+          timestamp: DateTime.now().subtract(const Duration(days: 42)),
+          referenceId: 'VYR-8921',
+        ),
+        PointsTransaction(
+          id: 'tx_seed_2',
+          type: PointsTransactionType.tierBonus,
+          pointsDelta: 5000,
+          title: 'Black Tier Elite Welcome Bonus',
+          description: 'Prestige tier attainment celebration grant',
+          timestamp: DateTime.now().subtract(const Duration(days: 30)),
+        ),
+        PointsTransaction(
+          id: 'tx_seed_3',
+          type: PointsTransactionType.earned,
+          pointsDelta: 7350,
+          title: 'Le Sirenuse Positano Suite',
+          description: 'Completed 3-night stay · Emerald VIP Perks',
+          timestamp: DateTime.now().subtract(const Duration(days: 12)),
+          referenceId: 'VYR-4410',
+        ),
+      ];
+      _savePointsLedger();
+    }
+
+    // Load vouchers
+    final storedVouchers = VeyraStorageService.getRewardVouchers();
+    if (storedVouchers != null && storedVouchers.isNotEmpty) {
+      _vouchers = storedVouchers.map((m) => RewardVoucher.fromJson(m)).toList();
+    }
+
+    // Load sessions
+    final storedSessions = VeyraStorageService.getDeviceSessions();
+    if (storedSessions != null && storedSessions.isNotEmpty) {
+      _sessions = storedSessions.map((m) => DeviceSession.fromJson(m)).toList();
+    }
+
     final storedCards = VeyraStorageService.getPaymentCards();
     if (storedCards != null && storedCards.isNotEmpty) {
       _paymentCards = storedCards.map((c) => PaymentCard(
@@ -171,7 +227,17 @@ class UserProfileController extends ChangeNotifier {
   String get email => _email;
   String get avatarUrl => _avatarUrl;
   int get points => _points;
-  String get tier => _tier;
+
+  /// Dynamic loyalty tier calculated mathematically from total points earned
+  int get lifetimePoints => _pointsLedger
+      .where((t) => t.pointsDelta > 0)
+      .fold(0, (sum, t) => sum + t.pointsDelta);
+
+  VeyraTier get tierEnum => TierMath.calculateTier(lifetimePoints > 0 ? lifetimePoints : _points);
+  String get tier => TierMath.tierName(tierEnum);
+  double get tierProgress => TierMath.calculateTierProgress(lifetimePoints > 0 ? lifetimePoints : _points);
+  int get pointsToNextTier => TierMath.pointsToNextTier(lifetimePoints > 0 ? lifetimePoints : _points);
+  VeyraTier? get nextTier => TierMath.nextTier(tierEnum);
 
   String get language => _language;
   bool get priceDropAlerts => _priceDropAlerts;
@@ -188,6 +254,7 @@ class UserProfileController extends ChangeNotifier {
   List<PaymentCard> get paymentCards => List.unmodifiable(_paymentCards);
   List<DeviceSession> get sessions => List.unmodifiable(_sessions);
   List<RewardVoucher> get vouchers => List.unmodifiable(_vouchers);
+  List<PointsTransaction> get pointsLedger => List.unmodifiable(_pointsLedger);
 
   PaymentCard? get defaultCard {
     for (final c in _paymentCards) {
@@ -211,21 +278,77 @@ class UserProfileController extends ChangeNotifier {
     }
   }
 
-  bool redeemReward(String title, int pointsCost) {
+  void _savePointsLedger() {
+    final list = _pointsLedger.map((tx) => tx.toJson()).toList();
+    VeyraStorageService.setPointsLedger(list);
+  }
+
+  void _saveVouchers() {
+    final list = _vouchers.map((v) => v.toJson()).toList();
+    VeyraStorageService.setRewardVouchers(list);
+  }
+
+  void _saveSessions() {
+    final list = _sessions.map((s) => s.toJson()).toList();
+    VeyraStorageService.setDeviceSessions(list);
+  }
+
+  /// Records points earned through a verified booking or promotion.
+  void recordPointsEarned({
+    required String title,
+    required String description,
+    required int points,
+    String? referenceId,
+  }) {
+    if (points <= 0) return;
+    _points += points;
+    VeyraStorageService.setPoints(_points);
+
+    final tx = PointsTransaction(
+      id: 'tx_${DateTime.now().millisecondsSinceEpoch}',
+      type: PointsTransactionType.earned,
+      pointsDelta: points,
+      title: title,
+      description: description,
+      timestamp: DateTime.now(),
+      referenceId: referenceId,
+    );
+    _pointsLedger.insert(0, tx);
+    _savePointsLedger();
+    notifyListeners();
+  }
+
+  /// Atomically redeems rewards, debits ledger, and saves durable voucher.
+  bool redeemReward(String title, int pointsCost, {int discountAmountCents = 15000}) {
     if (_points >= pointsCost) {
       _points -= pointsCost;
       VeyraStorageService.setPoints(_points);
+
       final code = 'VRA-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      _vouchers.insert(
-        0,
-        RewardVoucher(
-          id: 'v_${DateTime.now().millisecondsSinceEpoch}',
-          title: title,
-          code: code,
-          pointsSpent: pointsCost,
-          redeemedAt: DateTime.now(),
-        ),
+      final voucher = RewardVoucher(
+        id: 'v_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        code: code,
+        pointsSpent: pointsCost,
+        discountAmountCents: discountAmountCents,
+        redeemedAt: DateTime.now(),
+        expiresAt: DateTime.now().add(const Duration(days: 365)),
       );
+      _vouchers.insert(0, voucher);
+      _saveVouchers();
+
+      final tx = PointsTransaction(
+        id: 'tx_${DateTime.now().millisecondsSinceEpoch}',
+        type: PointsTransactionType.redeemed,
+        pointsDelta: -pointsCost,
+        title: 'Redeemed: $title',
+        description: 'Voucher code: $code · Valid for 1 year',
+        timestamp: DateTime.now(),
+        referenceId: voucher.id,
+      );
+      _pointsLedger.insert(0, tx);
+      _savePointsLedger();
+
       notifyListeners();
       return true;
     }
@@ -346,8 +469,31 @@ class UserProfileController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void revokeSession(String id) {
+    _sessions.removeWhere((s) => s.id == id && !s.isCurrent);
+    _saveSessions();
+    notifyListeners();
+  }
+
   void revokeOtherSessions() {
     _sessions.removeWhere((s) => !s.isCurrent);
+    _saveSessions();
+    notifyListeners();
+  }
+
+  /// Terminates active session and resets user security tokens.
+  Future<void> signOut() async {
+    _sessions.clear();
+    _sessions.add(
+      DeviceSession(
+        id: 'session_guest_${DateTime.now().millisecondsSinceEpoch}',
+        deviceName: 'Current Device',
+        location: 'Local',
+        lastActive: 'Just now',
+        isCurrent: true,
+      ),
+    );
+    _saveSessions();
     notifyListeners();
   }
 }

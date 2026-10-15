@@ -156,4 +156,78 @@ class VeyraStorageService {
     final raw = jsonEncode(cards);
     return await _prefs?.setString(_kPaymentCards, raw) ?? false;
   }
+
+  // Points Ledger
+  static const String _kPointsLedger = 'veyra_points_ledger';
+  static List<Map<String, dynamic>>? getPointsLedger() {
+    final raw = _prefs?.getString(_kPointsLedger);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw) as List;
+      return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> setPointsLedger(List<Map<String, dynamic>> entries) async {
+    final raw = jsonEncode(entries);
+    return await _prefs?.setString(_kPointsLedger, raw) ?? false;
+  }
+
+  // Reward Vouchers
+  static const String _kRewardVouchers = 'veyra_reward_vouchers';
+  static List<Map<String, dynamic>>? getRewardVouchers() {
+    final raw = _prefs?.getString(_kRewardVouchers);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw) as List;
+      return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> setRewardVouchers(List<Map<String, dynamic>> vouchers) async {
+    final raw = jsonEncode(vouchers);
+    return await _prefs?.setString(_kRewardVouchers, raw) ?? false;
+  }
+
+  // Device Sessions
+  static const String _kDeviceSessions = 'veyra_device_sessions';
+  static List<Map<String, dynamic>>? getDeviceSessions() {
+    final raw = _prefs?.getString(_kDeviceSessions);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw) as List;
+      return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<bool> setDeviceSessions(List<Map<String, dynamic>> sessions) async {
+    final raw = jsonEncode(sessions);
+    return await _prefs?.setString(_kDeviceSessions, raw) ?? false;
+  }
+
+  // Recent Searches
+  static const String _kRecentSearches = 'veyra_recent_searches';
+  static List<String> getRecentSearches() {
+    return _prefs?.getStringList(_kRecentSearches) ??
+        ['Kyoto', 'Amalfi Coast', 'Overwater Villas', 'Zermatt Alps'];
+  }
+
+  static Future<bool> addRecentSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return false;
+    final current = getRecentSearches().where((q) => q.toLowerCase() != trimmed.toLowerCase()).toList();
+    current.insert(0, trimmed);
+    if (current.length > 10) current.removeLast();
+    return await _prefs?.setStringList(_kRecentSearches, current) ?? false;
+  }
+
+  static Future<bool> clearRecentSearches() async {
+    return await _prefs?.remove(_kRecentSearches) ?? false;
+  }
 }
