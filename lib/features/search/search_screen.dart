@@ -98,7 +98,10 @@ class _SearchBodyState extends State<_SearchBody> {
                           stays: widget.ctrl.results,
                           ctrl: widget.ctrl,
                         )
-                      : _SearchResultsArea(ctrl: widget.ctrl),
+                      : _SearchResultsArea(
+                          ctrl: widget.ctrl,
+                          queryCtrl: widget.queryCtrl,
+                        ),
                 ),
               ],
             ),
@@ -190,6 +193,11 @@ class _SearchInputBar extends StatelessWidget {
               autofocus: false,
               textInputAction: TextInputAction.search,
               onChanged: ctrl.updateQuery,
+              onSubmitted: (val) {
+                if (val.trim().isNotEmpty) {
+                  ctrl.addRecentSearch(val.trim());
+                }
+              },
               decoration: InputDecoration(
                 hintText: 'Search destinations, hotels…',
                 prefixIcon: const Icon(Icons.search_rounded),
@@ -399,7 +407,8 @@ class _FilterChip2 extends StatelessWidget {
 
 class _SearchResultsArea extends StatelessWidget {
   final StaySearchController ctrl;
-  const _SearchResultsArea({required this.ctrl});
+  final TextEditingController queryCtrl;
+  const _SearchResultsArea({required this.ctrl, required this.queryCtrl});
 
   @override
   Widget build(BuildContext context) {
@@ -424,7 +433,7 @@ class _SearchResultsArea extends StatelessWidget {
     }
     if (!ctrl.hasResults) {
       if (ctrl.state == LoadState.idle && ctrl.recentSearches.isNotEmpty) {
-        return _RecentSearches(ctrl: ctrl);
+        return _RecentSearches(ctrl: ctrl, queryCtrl: queryCtrl);
       }
       return EmptyState(
         icon: Icons.search_off_rounded,
@@ -497,7 +506,8 @@ class _SearchResultsGrid extends StatelessWidget {
 
 class _RecentSearches extends StatelessWidget {
   final StaySearchController ctrl;
-  const _RecentSearches({required this.ctrl});
+  final TextEditingController queryCtrl;
+  const _RecentSearches({required this.ctrl, required this.queryCtrl});
 
   @override
   Widget build(BuildContext context) {
@@ -508,17 +518,68 @@ class _RecentSearches extends StatelessWidget {
         subtitle: 'Search by destination, hotel name, or country.',
       );
     }
-    return ListView.builder(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    return ListView(
       padding: const EdgeInsets.all(VeyraTokens.spaceMD),
-      itemCount: ctrl.recentSearches.length,
-      itemBuilder: (context, i) {
-        final q = ctrl.recentSearches[i];
-        return ListTile(
-          leading: const Icon(Icons.history_rounded),
-          title: Text(q, style: Theme.of(context).textTheme.bodyLarge),
-          onTap: () => ctrl.updateQuery(q),
-        );
-      },
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.history_rounded, size: 20, color: VeyraTokens.antiqueGold),
+            const SizedBox(width: 8),
+            Text(
+              'Recent Searches',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const Spacer(),
+            TextButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ctrl.clearRecentSearches();
+              },
+              child: Text(
+                'Clear',
+                style: TextStyle(
+                  color: isDark ? Colors.white60 : Colors.black54,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: VeyraTokens.spaceXS),
+        ...ctrl.recentSearches.map((q) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            decoration: BoxDecoration(
+              color: isDark ? VeyraTokens.darkCardSurface : VeyraTokens.lightCardSurface,
+              borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+              border: Border.all(
+                color: scheme.outline.withValues(alpha: 0.1),
+              ),
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.schedule_rounded, size: 18),
+              title: Text(q, style: Theme.of(context).textTheme.bodyMedium),
+              trailing: IconButton(
+                icon: const Icon(Icons.close_rounded, size: 16),
+                tooltip: 'Remove',
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ctrl.removeRecentSearch(q);
+                },
+              ),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                queryCtrl.text = q;
+                ctrl.updateQuery(q);
+              },
+            ),
+          );
+        }),
+      ],
     );
   }
 }

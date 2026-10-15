@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/stay.dart';
 import '../../data/models/search_criteria.dart';
 import '../../data/repositories/stay_repository.dart';
+import '../../core/storage/veyra_storage_service.dart';
 
 enum LoadState { idle, loading, loaded, error }
 
@@ -98,7 +99,9 @@ class ExploreController extends ChangeNotifier {
 class StaySearchController extends ChangeNotifier {
   final StayRepository _stayRepo;
 
-  StaySearchController(this._stayRepo);
+  StaySearchController(this._stayRepo) {
+    _recentSearches.addAll(VeyraStorageService.getRecentSearches());
+  }
 
   SearchCriteria _criteria = SearchCriteria.empty;
   List<Stay> _results = [];
@@ -142,10 +145,25 @@ class StaySearchController extends ChangeNotifier {
   }
 
   void addRecentSearch(String query) {
-    if (query.isEmpty) return;
-    _recentSearches.remove(query);
-    _recentSearches.insert(0, query);
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    _recentSearches.remove(trimmed);
+    _recentSearches.insert(0, trimmed);
     if (_recentSearches.length > 8) _recentSearches.removeLast();
+    VeyraStorageService.addRecentSearch(trimmed);
+    notifyListeners();
+  }
+
+  void removeRecentSearch(String query) {
+    final trimmed = query.trim();
+    _recentSearches.remove(trimmed);
+    VeyraStorageService.removeRecentSearch(trimmed);
+    notifyListeners();
+  }
+
+  void clearRecentSearches() {
+    _recentSearches.clear();
+    VeyraStorageService.clearRecentSearches();
     notifyListeners();
   }
 

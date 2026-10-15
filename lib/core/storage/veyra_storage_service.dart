@@ -227,6 +227,12 @@ class VeyraStorageService {
     return await _prefs?.setStringList(_kRecentSearches, current) ?? false;
   }
 
+  static Future<bool> removeRecentSearch(String query) async {
+    final trimmed = query.trim();
+    final current = getRecentSearches().where((q) => q.toLowerCase() != trimmed.toLowerCase()).toList();
+    return await _prefs?.setStringList(_kRecentSearches, current) ?? false;
+  }
+
   static Future<bool> clearRecentSearches() async {
     return await _prefs?.remove(_kRecentSearches) ?? false;
   }

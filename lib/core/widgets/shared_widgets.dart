@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
@@ -867,4 +868,17 @@ class ErrorState extends StatelessWidget {
       onAction: onRetry,
     );
   }
+}
+
+/// Resolves an avatar string to either a MemoryImage (for base64/data URI) or NetworkImage.
+ImageProvider avatarImageProvider(String avatarUrl) {
+  if (avatarUrl.startsWith('data:image/') || avatarUrl.startsWith('base64,')) {
+    final base64Str = avatarUrl.contains(',') ? avatarUrl.split(',').last : avatarUrl;
+    try {
+      return MemoryImage(base64Decode(base64Str));
+    } catch (_) {
+      // Fallback if decoding fails
+    }
+  }
+  return NetworkImage(avatarUrl);
 }

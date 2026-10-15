@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/design_tokens.dart';
 import '../../../core/scope/app_scope.dart';
 import '../../../core/localization/app_translations.dart';
 import '../../../core/widgets/fade_pop_item.dart';
+import '../../../core/widgets/shared_widgets.dart';
 import '../../../core/biometrics/biometric_service.dart';
 import '../../../core/services/alert_service.dart';
 
@@ -31,6 +34,9 @@ class AvatarPickerSheet extends StatefulWidget {
 
 class _AvatarPickerSheetState extends State<AvatarPickerSheet> {
   late final TextEditingController _nameCtrl;
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploading = false;
+  String? _uploadError;
 
   static const List<Map<String, String>> _avatars = [
     {
@@ -71,6 +77,56 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet> {
     super.dispose();
   }
 
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    try {
+      setState(() {
+        _isUploading = true;
+        _uploadError = null;
+      });
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) {
+        setState(() => _isUploading = false);
+        return;
+      }
+
+      final bytes = await pickedFile.readAsBytes();
+      if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+        setState(() {
+          _isUploading = false;
+          _uploadError = 'Image exceeds 5MB limit. Please choose a smaller photo.';
+        });
+        return;
+      }
+
+      final base64String = base64Encode(bytes);
+      final dataUri = 'data:image/jpeg;base64,$base64String';
+
+      HapticFeedback.mediumImpact();
+      widget.profileCtrl.updateAvatar(dataUri);
+
+      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Custom profile picture uploaded and saved securely.'),
+            backgroundColor: VeyraTokens.deepEmerald,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isUploading = false;
+        _uploadError = 'Failed to load photo: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -78,7 +134,7 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet> {
 
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.85,
+        maxHeight: MediaQuery.of(context).size.height * 0.88,
       ),
       padding: EdgeInsets.fromLTRB(
         VeyraTokens.spaceLG,
@@ -95,109 +151,215 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-          Container(
-            width: 44,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
+            Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: VeyraTokens.spaceMD),
-          Text(
-            'Personalize Profile',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Choose your VIP avatar or update your identity',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: VeyraTokens.spaceLG),
-          SizedBox(
-            height: 110,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _avatars.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(width: VeyraTokens.spaceMD),
-              itemBuilder: (context, i) {
-                final item = _avatars[i];
-                final isSelected = widget.profileCtrl.avatarUrl == item['url'];
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    widget.profileCtrl.updateAvatar(item['url']!);
-                    setState(() {});
-                  },
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? scheme.primary
-                                : Colors.transparent,
-                            width: 2.5,
+            const SizedBox(height: VeyraTokens.spaceMD),
+            Text(
+              'Personalize Profile',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Upload your custom photo or select a VIP ambassador avatar',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: VeyraTokens.spaceLG),
+
+            // Current Avatar Preview
+            Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [scheme.primary, VeyraTokens.antiqueGold],
+                      ),
+                      boxShadow: VeyraTokens.shadowMD,
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: CircleAvatar(
+                      backgroundImage: avatarImageProvider(widget.profileCtrl.avatarUrl),
+                    ),
+                  ),
+                  if (_isUploading)
+                    Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.6),
+                      ),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          color: VeyraTokens.antiqueGold,
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            if (_uploadError != null) ...[
+              const SizedBox(height: VeyraTokens.spaceSM),
+              Text(
+                _uploadError!,
+                style: VeyraTokens.bodySmall.copyWith(color: VeyraTokens.error),
+                textAlign: TextAlign.center,
+              ),
+            ],
+
+            const SizedBox(height: VeyraTokens.spaceMD),
+
+            // Real Photo Upload Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+                      ),
+                      side: BorderSide(color: scheme.primary.withValues(alpha: 0.4)),
+                    ),
+                    icon: Icon(Icons.camera_alt_rounded, size: 18, color: scheme.primary),
+                    label: Text(
+                      'Take Photo',
+                      style: VeyraTokens.labelSmall.copyWith(color: scheme.primary),
+                    ),
+                    onPressed: _isUploading
+                        ? null
+                        : () => _pickAndUploadPhoto(ImageSource.camera),
+                  ),
+                ),
+                const SizedBox(width: VeyraTokens.spaceSM),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+                      ),
+                      side: BorderSide(color: scheme.primary.withValues(alpha: 0.4)),
+                    ),
+                    icon: Icon(Icons.photo_library_rounded, size: 18, color: scheme.primary),
+                    label: Text(
+                      'Choose Photo',
+                      style: VeyraTokens.labelSmall.copyWith(color: scheme.primary),
+                    ),
+                    onPressed: _isUploading
+                        ? null
+                        : () => _pickAndUploadPhoto(ImageSource.gallery),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: VeyraTokens.spaceLG),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Or choose a VIP Ambassador portrait:',
+                style: VeyraTokens.labelSmall.copyWith(
+                  color: isDark ? VeyraTokens.darkSubtext : VeyraTokens.lightSubtext,
+                ),
+              ),
+            ),
+            const SizedBox(height: VeyraTokens.spaceSM),
+
+            SizedBox(
+              height: 104,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _avatars.length,
+                separatorBuilder: (_, __) => const SizedBox(width: VeyraTokens.spaceMD),
+                itemBuilder: (context, i) {
+                  final item = _avatars[i];
+                  final isSelected = widget.profileCtrl.avatarUrl == item['url'];
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      widget.profileCtrl.updateAvatar(item['url']!);
+                      setState(() {});
+                    },
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? scheme.primary : Colors.transparent,
+                              width: 2.5,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 32,
+                            backgroundImage: avatarImageProvider(item['url']!),
                           ),
                         ),
-                        child: CircleAvatar(
-                          radius: 34,
-                          backgroundImage: NetworkImage(item['url']!),
+                        const SizedBox(height: 5),
+                        Text(
+                          item['title']!.split(' ').first,
+                          style: VeyraTokens.labelSmall.copyWith(
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                            color: isSelected ? scheme.primary : null,
+                            fontSize: 11,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item['title']!.split(' ').first,
-                        style: VeyraTokens.labelSmall.copyWith(
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.normal,
-                          color: isSelected ? scheme.primary : null,
-                        ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: VeyraTokens.spaceMD),
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Full Name',
+                prefixIcon: const Icon(Icons.person_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+                ),
+              ),
+            ),
+            const SizedBox(height: VeyraTokens.spaceLG),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                backgroundColor: scheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+                ),
+              ),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                widget.profileCtrl.updateName(_nameCtrl.text);
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Profile updated successfully.')),
                 );
               },
+              child: const Text('Save Changes'),
             ),
-          ),
-          const SizedBox(height: VeyraTokens.spaceMD),
-          TextField(
-            controller: _nameCtrl,
-            decoration: InputDecoration(
-              labelText: 'Full Name',
-              prefixIcon: const Icon(Icons.person_rounded),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
-              ),
-            ),
-          ),
-          const SizedBox(height: VeyraTokens.spaceLG),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              backgroundColor: scheme.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
-              ),
-            ),
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              widget.profileCtrl.updateName(_nameCtrl.text);
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile updated successfully.')),
-              );
-            },
-            child: const Text('Save Changes'),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
   }
 }
 
@@ -361,7 +523,9 @@ class LoyaltyRewardsSheet extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  'Royal Ambassador (5,000 pts)',
+                                  profileCtrl.nextTier != null
+                                      ? '${TierMath.tierName(profileCtrl.nextTier!)} (${profileCtrl.pointsToNextTier} pts)'
+                                      : 'Apex Tier Reached',
                                   style: VeyraTokens.labelSmall.copyWith(
                                     color: Colors.white,
                                   ),
@@ -374,7 +538,7 @@ class LoyaltyRewardsSheet extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            value: (profileCtrl.points / 5000.0).clamp(0.0, 1.0),
+                            value: profileCtrl.tierProgress,
                             backgroundColor: Colors.white.withValues(alpha: 0.15),
                             valueColor: const AlwaysStoppedAnimation(
                               VeyraTokens.antiqueGold,
@@ -523,6 +687,84 @@ class LoyaltyRewardsSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ],
+
+                  if (profileCtrl.pointsLedger.isNotEmpty) ...[
+                    const SizedBox(height: VeyraTokens.spaceLG),
+                    Row(
+                      children: [
+                        const Icon(Icons.receipt_long_rounded, size: 18, color: VeyraTokens.antiqueGold),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Points Activity Ledger (Audited)',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: VeyraTokens.spaceSM),
+                    ...profileCtrl.pointsLedger.take(5).map((tx) {
+                      final isPositive = tx.pointsDelta >= 0;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: VeyraTokens.spaceSM),
+                        padding: const EdgeInsets.all(VeyraTokens.spaceMD),
+                        decoration: BoxDecoration(
+                          color: isDark ? VeyraTokens.darkCardSurface : VeyraTokens.lightCardSurface,
+                          borderRadius: BorderRadius.circular(VeyraTokens.radiusMD),
+                          border: Border.all(
+                            color: scheme.outline.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: (isPositive ? VeyraTokens.success : Colors.redAccent)
+                                    .withValues(alpha: 0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isPositive ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded,
+                                color: isPositive ? VeyraTokens.success : Colors.redAccent,
+                                size: 18,
+                              ),
+                            ),
+                            const SizedBox(width: VeyraTokens.spaceSM),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    tx.title,
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    tx.description,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: isDark ? Colors.white60 : Colors.black54,
+                                        ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              '${isPositive ? '+' : ''}${tx.pointsDelta} pts',
+                              style: TextStyle(
+                                color: isPositive ? VeyraTokens.success : Colors.redAccent,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                   const SizedBox(height: VeyraTokens.space2XL),
                 ],

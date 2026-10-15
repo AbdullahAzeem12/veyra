@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../core/widgets/fade_pop_item.dart';
+import '../../core/widgets/shared_widgets.dart';
 import '../../core/localization/app_translations.dart';
 import '../../app.dart';
 import 'widgets/profile_sheets.dart';
@@ -361,7 +362,7 @@ class _AvatarBadge extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(3),
             child: CircleAvatar(
-              backgroundImage: NetworkImage(avatarUrl),
+              backgroundImage: avatarImageProvider(avatarUrl),
             ),
           ),
           Positioned(

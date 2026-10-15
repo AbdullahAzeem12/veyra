@@ -189,7 +189,7 @@ class _HeaderTopRow extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(2),
             child: CircleAvatar(
-              backgroundImage: NetworkImage(avatarUrl),
+              backgroundImage: avatarImageProvider(avatarUrl),
             ),
           ),
         ),

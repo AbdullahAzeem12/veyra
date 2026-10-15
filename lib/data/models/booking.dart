@@ -284,6 +284,9 @@ class Booking {
   bool get isCancellable =>
       status == BookingStatus.pending || status == BookingStatus.confirmed;
 
+  int get addOnsTotalCents => price.addOnsTotalCents;
+  int get totalCents => price.totalCents;
+
   Booking copyWith({
     BookingStatus? status,
     RefundStatus? refundStatus,

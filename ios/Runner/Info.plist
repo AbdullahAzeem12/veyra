@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Veyra uses Face ID to securely authenticate VIP members and protect confidential booking details.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Veyra uses photo library access to allow you to select and upload your profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Veyra uses camera access to take a real photo for your profile avatar.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
