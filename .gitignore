@@ -44,3 +44,5 @@ migrate_working_dir/
 # Coverage
 coverage/
 
+# Archives
+*.zip
