@@ -518,3 +518,173 @@ class _FeaturedCardInfo extends StatelessWidget {
     );
   }
 }
+
+/// Compact luxury sanctuary card engineered for horizontal discovery carousels.
+class LuxurySanctuaryCard extends StatelessWidget {
+  final Stay stay;
+  final bool isSaved;
+  final VoidCallback onTap;
+  final VoidCallback onFavoriteTap;
+  final String? badgeText;
+  final String? heroTag;
+
+  const LuxurySanctuaryCard({
+    super.key,
+    required this.stay,
+    required this.isSaved,
+    required this.onTap,
+    required this.onFavoriteTap,
+    this.badgeText,
+    this.heroTag,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveHeroTag = heroTag ?? 'sanctuary_image_${stay.id}';
+    return VeyraPressable(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(VeyraTokens.radiusLG),
+      child: Container(
+        width: 220,
+        margin: const EdgeInsets.only(right: VeyraTokens.spaceMD - 2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(VeyraTokens.radiusLG),
+          boxShadow: VeyraTokens.shadowMD,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background Image
+            Hero(
+              tag: effectiveHeroTag,
+              createRectTween: (begin, end) =>
+                  MaterialRectArcTween(begin: begin, end: end),
+              child: CachedNetworkImage(
+                imageUrl: stay.primaryImageUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => const ShimmerSkeleton(
+                  borderRadius: BorderRadius.zero,
+                ),
+                errorWidget: (_, __, ___) => Container(color: Colors.grey.shade400),
+              ),
+            ),
+            // Gradient Overlay
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.7),
+                    ],
+                    stops: const [0.35, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            // Top Badge (Category / Highlight)
+            Positioned(
+              top: VeyraTokens.spaceSM,
+              left: VeyraTokens.spaceSM,
+              child: VeyraGlassSurface(
+                preset: VeyraGlassPreset.subtle,
+                borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                child: Text(
+                  badgeText ?? stay.category,
+                  style: VeyraTokens.labelSmall.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+            ),
+            // Favorite Button
+            Positioned(
+              top: VeyraTokens.spaceXS,
+              right: VeyraTokens.spaceXS,
+              child: FavoriteButton(
+                isSaved: isSaved,
+                onTap: onFavoriteTap,
+                size: 16,
+              ),
+            ),
+            // Bottom Glass Info Panel
+            Positioned(
+              left: VeyraTokens.spaceSM,
+              right: VeyraTokens.spaceSM,
+              bottom: VeyraTokens.spaceSM,
+              child: VeyraGlassSurface(
+                preset: VeyraGlassPreset.floating,
+                borderRadius: BorderRadius.circular(VeyraTokens.radiusSM),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      stay.title,
+                      style: VeyraTokens.titleSmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${stay.destination}, ${stay.country}',
+                      style: VeyraTokens.bodySmall.copyWith(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 10,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        RatingBadge(rating: stay.rating, dark: true),
+                        const Spacer(),
+                        Builder(
+                          builder: (context) {
+                            final currencyCtrl = AppScope.currencyCtrlOf(context);
+                            final priceStr = currencyCtrl != null
+                                ? currencyCtrl.formatCents(stay.nightlyPriceCents)
+                                : stay.nightlyPriceDisplay;
+                            return Text(
+                              priceStr,
+                              style: VeyraTokens.labelSmall.copyWith(
+                                color: VeyraTokens.antiqueGold,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            );
+                          },
+                        ),
+                        Text(
+                          '/n',
+                          style: VeyraTokens.bodySmall.copyWith(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

@@ -34,6 +34,7 @@ class ExploreController extends ChangeNotifier {
     'Island',
     'Overwater',
     'Chalet',
+    'Hotel',
   ];
 
   List<String> get categories => defaultCategories;
@@ -82,7 +83,31 @@ class ExploreController extends ChangeNotifier {
 
   List<Stay> get filteredRecommended {
     if (_selectedCategory == 'All') return _recommended;
-    return _recommended.where((s) => s.category == _selectedCategory).toList();
+    final normalized = _normalizeCategory(_selectedCategory);
+    return _recommended
+        .where((s) => _normalizeCategory(s.category) == normalized)
+        .toList();
+  }
+
+  /// Top-rated sanctuaries with 4.9+ rating and verified prestige
+  List<Stay> get trendingSanctuaries {
+    return _recommended.where((s) => s.rating >= 4.9).toList();
+  }
+
+  /// Exclusive secluded estates (Châteaux, Private Islands, Alpine Chalets)
+  List<Stay> get exclusiveEstates {
+    return _recommended.where((s) {
+      final cat = _normalizeCategory(s.category);
+      return cat == 'chateau' || cat == 'island' || cat == 'chalet';
+    }).toList();
+  }
+
+  static String _normalizeCategory(String cat) {
+    return cat
+        .toLowerCase()
+        .replaceAll('â', 'a')
+        .replaceAll('é', 'e')
+        .trim();
   }
 
   Future<void> refresh() async => load();
@@ -131,6 +156,10 @@ class StaySearchController extends ChangeNotifier {
 
   void setCategory(String? category) {
     setCriteria(_criteria.copyWith(category: category));
+  }
+
+  void updateMinRating(double minRating) {
+    setCriteria(_criteria.copyWith(minRating: minRating));
   }
 
   void setSortBy(SortBy sort) {

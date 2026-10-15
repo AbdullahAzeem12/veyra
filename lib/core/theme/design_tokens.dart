@@ -99,11 +99,32 @@ abstract class VeyraTokens {
     height: 1.4,
   );
 
+  static const TextStyle titleMedium = TextStyle(
+    fontFamily: fontBody,
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    height: 1.35,
+  );
+
+  static const TextStyle titleSmall = TextStyle(
+    fontFamily: fontBody,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    height: 1.35,
+  );
+
   static const TextStyle labelLarge = TextStyle(
     fontFamily: fontBody,
     fontSize: 14,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.2,
+  );
+
+  static const TextStyle labelMedium = TextStyle(
+    fontFamily: fontBody,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.3,
   );
 
   static const TextStyle labelSmall = TextStyle(

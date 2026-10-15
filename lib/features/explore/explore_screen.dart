@@ -6,7 +6,6 @@ import '../../core/widgets/shared_widgets.dart';
 import '../../core/widgets/stay_card.dart';
 import '../../core/widgets/fade_pop_item.dart';
 import '../../core/localization/app_translations.dart';
-import '../../core/responsive/adaptive_scaffold.dart';
 import '../../data/models/stay.dart';
 import '../../data/demo/demo_data.dart';
 import '../../core/navigation/app_router.dart';
@@ -72,12 +71,16 @@ class _ExploreBody extends StatelessWidget {
     return RefreshIndicator(
       onRefresh: ctrl.refresh,
       child: CustomScrollView(
+        physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: [
           _ExploreHeader(ctrl: ctrl),
           _CategorySection(ctrl: ctrl),
           const _CuratedDestinationsSection(),
           _FeaturedSection(stays: ctrl.featured, ctrl: ctrl),
-          _RecommendedSection(stays: ctrl.filteredRecommended, ctrl: ctrl),
+          _TrendingSanctuariesSection(stays: ctrl.trendingSanctuaries, ctrl: ctrl),
+          _ExclusiveEstatesSection(stays: ctrl.exclusiveEstates, ctrl: ctrl),
+          _RecommendedHeader(ctrl: ctrl),
+          _RecommendedSliverGrid(stays: ctrl.filteredRecommended, ctrl: ctrl),
           const SliverToBoxAdapter(
             child: SizedBox(height: VeyraTokens.space2XL),
           ),
@@ -314,25 +317,30 @@ class _CategorySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SliverToBoxAdapter(
-      child: SizedBox(
-        height: 52,
+      child: Container(
+        margin: const EdgeInsets.only(
+          top: VeyraTokens.spaceSM,
+          bottom: VeyraTokens.spaceXS,
+        ),
+        height: 48,
         child: ListView.separated(
-          padding: const EdgeInsets.symmetric(
-            horizontal: VeyraTokens.spaceMD,
-            vertical: VeyraTokens.spaceSM,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
           itemCount: ctrl.categories.length,
           separatorBuilder: (_, __) =>
               const SizedBox(width: VeyraTokens.spaceSM),
           itemBuilder: (context, i) {
             final cat = ctrl.categories[i];
             final selected = ctrl.selectedCategory == cat;
+            final count = _getCategoryCount(cat, ctrl.recommended);
             return FadePopItem(
               index: i,
               child: _CategoryChip(
                 label: cat,
                 selected: selected,
+                count: count,
+                icon: _getCategoryIcon(cat),
                 onTap: () {
                   HapticFeedback.lightImpact();
                   ctrl.setCategory(cat);
@@ -344,16 +352,60 @@ class _CategorySection extends StatelessWidget {
       ),
     );
   }
+
+  static int _getCategoryCount(String category, List<Stay> stays) {
+    if (category == 'All') return stays.length;
+    final norm = category
+        .toLowerCase()
+        .replaceAll('â', 'a')
+        .replaceAll('é', 'e')
+        .trim();
+    return stays
+        .where((s) =>
+            s.category
+                .toLowerCase()
+                .replaceAll('â', 'a')
+                .replaceAll('é', 'e')
+                .trim() ==
+            norm)
+        .length;
+  }
+
+  static IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'all':
+        return Icons.auto_awesome_rounded;
+      case 'villa':
+        return Icons.holiday_village_rounded;
+      case 'château':
+      case 'chateau':
+        return Icons.castle_rounded;
+      case 'island':
+        return Icons.beach_access_rounded;
+      case 'overwater':
+        return Icons.water_rounded;
+      case 'chalet':
+        return Icons.cabin_rounded;
+      case 'hotel':
+        return Icons.hotel_rounded;
+      default:
+        return Icons.travel_explore_rounded;
+    }
+  }
 }
 
 class _CategoryChip extends StatelessWidget {
   final String label;
   final bool selected;
+  final int count;
+  final IconData icon;
   final VoidCallback onTap;
 
   const _CategoryChip({
     required this.label,
     required this.selected,
+    required this.count,
+    required this.icon,
     required this.onTap,
   });
 
@@ -366,38 +418,106 @@ class _CategoryChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
       child: AnimatedContainer(
-        duration: VeyraTokens.durationFast,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(
-          horizontal: VeyraTokens.spaceMD,
-          vertical: VeyraTokens.spaceXS + 1,
+          horizontal: 14,
+          vertical: 8,
         ),
         decoration: BoxDecoration(
-          color: selected
-              ? scheme.primary
-              : (isDark ? VeyraTokens.darkCardSurface : Colors.white),
           borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+          gradient: selected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    scheme.primary,
+                    scheme.primary.withValues(alpha: 0.88),
+                  ],
+                )
+              : null,
+          color: selected
+              ? null
+              : (isDark
+                  ? VeyraTokens.darkCardSurface.withValues(alpha: 0.85)
+                  : Colors.white),
           border: Border.all(
             color: selected
-                ? scheme.primary
-                : (isDark ? VeyraTokens.darkBorder : VeyraTokens.lightBorder),
-            width: selected ? 1.5 : 1.0,
+                ? VeyraTokens.antiqueGold.withValues(alpha: 0.5)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : VeyraTokens.lightBorder),
+            width: selected ? 1.4 : 1.0,
           ),
           boxShadow: selected
               ? [
                   BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  )
+                    color: scheme.primary.withValues(alpha: 0.38),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
                 ]
-              : VeyraTokens.shadowSM,
+              : (isDark
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : VeyraTokens.shadowSM),
         ),
-        child: Text(
-          label,
-          style: VeyraTokens.labelSmall.copyWith(
-            color: selected ? scheme.onPrimary : scheme.onSurface,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 15,
+              color: selected
+                  ? Colors.white
+                  : (isDark ? VeyraTokens.antiqueGold : scheme.primary),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: VeyraTokens.labelMedium.copyWith(
+                color: selected
+                    ? Colors.white
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : scheme.onSurface),
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                fontSize: 12.5,
+                letterSpacing: 0.2,
+              ),
+            ),
+            if (count > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.25)
+                      : (isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : scheme.primary.withValues(alpha: 0.1)),
+                ),
+                child: Text(
+                  '$count',
+                  style: VeyraTokens.labelSmall.copyWith(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.bold,
+                    color: selected
+                        ? Colors.white
+                        : (isDark ? Colors.white70 : scheme.primary),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -595,39 +715,244 @@ class _FeaturedCardWrapper extends StatelessWidget {
   }
 }
 
-class _RecommendedSection extends StatelessWidget {
+class _TrendingSanctuariesSection extends StatelessWidget {
   final List<Stay> stays;
   final ExploreController ctrl;
 
-  const _RecommendedSection({required this.stays, required this.ctrl});
+  const _TrendingSanctuariesSection({required this.stays, required this.ctrl});
 
   @override
   Widget build(BuildContext context) {
     if (stays.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: VeyraTokens.spaceLG),
           _SectionHeader(
-            title: AppTranslations.tr(context, 'recommended_for_you'),
-            onSeeAll: () => navigateToSearch(context),
+            title: 'World-Class Sanctuaries',
+            subtitle: 'Iconic escapes rated 4.9+ stars',
+            onSeeAll: () {
+              final searchCtrl = AppScope.searchCtrlOf(context);
+              searchCtrl?.updateMinRating(4.8);
+              AppShell.switchTab(context, 1);
+            },
           ),
           const SizedBox(height: VeyraTokens.spaceSM),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
-            child: ResponsiveStayGrid(
-              cards: stays
-                  .asMap()
-                  .entries
-                  .map((e) => FadePopItem(
-                        index: e.key,
-                        child: _RecommendedCardWrapper(stay: e.value),
-                      ))
-                  .toList(),
+          SizedBox(
+            height: 236,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: stays.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(width: VeyraTokens.spaceSM + 4),
+              itemBuilder: (context, i) {
+                final stay = stays[i];
+                final savedCtrl = AppScope.savedCtrlOf(context);
+                final saved = savedCtrl?.isSaved(stay.id) ?? false;
+                final heroTag = 'sanctuary_stay_${stay.id}';
+
+                return FadePopItem(
+                  index: i,
+                  child: LuxurySanctuaryCard(
+                    stay: stay,
+                    isSaved: saved,
+                    heroTag: heroTag,
+                    badgeText: '★ ${stay.rating}',
+                    onTap: () => navigateToStayDetails(context, stay.id,
+                        heroTag: heroTag),
+                    onFavoriteTap: () {
+                      HapticFeedback.lightImpact();
+                      savedCtrl?.toggleSaved(stay.id);
+                    },
+                  ),
+                );
+              },
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ExclusiveEstatesSection extends StatelessWidget {
+  final List<Stay> stays;
+  final ExploreController ctrl;
+
+  const _ExclusiveEstatesSection({required this.stays, required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    if (stays.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+
+    return SliverToBoxAdapter(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: VeyraTokens.spaceLG),
+          _SectionHeader(
+            title: 'Estates, Islands & Chalets',
+            subtitle: 'Ultra-secluded retreats with bespoke service',
+            onSeeAll: () {
+              final searchCtrl = AppScope.searchCtrlOf(context);
+              searchCtrl?.setCategory('Château');
+              AppShell.switchTab(context, 1);
+            },
+          ),
+          const SizedBox(height: VeyraTokens.spaceSM),
+          SizedBox(
+            height: 236,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: stays.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(width: VeyraTokens.spaceSM + 4),
+              itemBuilder: (context, i) {
+                final stay = stays[i];
+                final savedCtrl = AppScope.savedCtrlOf(context);
+                final saved = savedCtrl?.isSaved(stay.id) ?? false;
+                final heroTag = 'exclusive_stay_${stay.id}';
+
+                return FadePopItem(
+                  index: i,
+                  child: LuxurySanctuaryCard(
+                    stay: stay,
+                    isSaved: saved,
+                    heroTag: heroTag,
+                    badgeText: stay.category,
+                    onTap: () => navigateToStayDetails(context, stay.id,
+                        heroTag: heroTag),
+                    onFavoriteTap: () {
+                      HapticFeedback.lightImpact();
+                      savedCtrl?.toggleSaved(stay.id);
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecommendedHeader extends StatelessWidget {
+  final ExploreController ctrl;
+  const _RecommendedHeader({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final count = ctrl.filteredRecommended.length;
+    final cat = ctrl.selectedCategory;
+    final title = cat == 'All'
+        ? AppTranslations.tr(context, 'recommended_for_you')
+        : '$cat Sanctuaries';
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.only(
+          top: VeyraTokens.spaceLG,
+          bottom: VeyraTokens.spaceSM,
+        ),
+        child: _SectionHeader(
+          title: title,
+          subtitle: '$count properties available for booking',
+          onSeeAll: () {
+            final searchCtrl = AppScope.searchCtrlOf(context);
+            if (cat != 'All') {
+              searchCtrl?.setCategory(cat);
+            }
+            AppShell.switchTab(context, 1);
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendedSliverGrid extends StatelessWidget {
+  final List<Stay> stays;
+  final ExploreController ctrl;
+
+  const _RecommendedSliverGrid({required this.stays, required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    if (stays.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: VeyraTokens.spaceMD,
+            vertical: VeyraTokens.spaceXL,
+          ),
+          child: Center(
+            child: Column(
+              children: [
+                Icon(
+                  Icons.holiday_village_outlined,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5),
+                ),
+                const SizedBox(height: VeyraTokens.spaceSM),
+                Text(
+                  'No ${ctrl.selectedCategory} stays found',
+                  style: VeyraTokens.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Try choosing another category or explore all stays.',
+                  style: VeyraTokens.bodySmall.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
+      sliver: SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.crossAxisExtent;
+          int columns;
+          if (width < 500) {
+            columns = 1;
+          } else if (width < 800) {
+            columns = 2;
+          } else if (width < 1200) {
+            columns = 3;
+          } else {
+            columns = 4;
+          }
+
+          return SliverGrid(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: VeyraTokens.spaceMD,
+              mainAxisSpacing: VeyraTokens.spaceMD,
+              childAspectRatio: columns == 1 ? 0.92 : 0.76,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                final stay = stays[index];
+                return ScrollFadePopItem(
+                  child: _RecommendedCardWrapper(stay: stay),
+                );
+              },
+              childCount: stays.length,
+            ),
+          );
+        },
       ),
     );
   }
@@ -659,9 +984,14 @@ class _RecommendedCardWrapper extends StatelessWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final VoidCallback? onSeeAll;
 
-  const _SectionHeader({required this.title, this.onSeeAll});
+  const _SectionHeader({
+    required this.title,
+    this.subtitle,
+    this.onSeeAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -671,15 +1001,36 @@ class _SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: VeyraTokens.spaceMD),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    shadows: VeyraTokens.headingShadows(isDark),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        shadows: VeyraTokens.headingShadows(isDark),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: VeyraTokens.bodySmall.copyWith(
+                      color: isDark ? Colors.white60 : Colors.black54,
+                      fontSize: 11.5,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+                ],
+              ],
             ),
           ),
           const SizedBox(width: VeyraTokens.spaceSM),

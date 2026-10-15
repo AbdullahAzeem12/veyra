@@ -169,15 +169,201 @@ class DemoBookingRepository implements BookingRepository {
   final StreamController<List<Booking>> _controller =
       StreamController<List<Booking>>.broadcast();
 
-  List<Booking> _bookingsForUser(String userId) =>
-      _bookings.values.where((b) => b.userId == userId).toList()
-        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  List<Booking> _bookingsForUser(String userId) {
+    _seedBookingsIfEmpty(userId);
+    return _bookings.values.where((b) => b.userId == userId).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  void _seedBookingsIfEmpty(String userId) {
+    if (_bookings.values.any((b) => b.userId == userId)) return;
+    final now = DateTime.now();
+
+    // 1. Upcoming Luxury Stay: Bora Bora Overwater Bungalow with Helicopter & Champagne
+    final b1 = Booking(
+      id: 'BK_SEED_1',
+      userId: userId,
+      stayId: 's001',
+      stayTitle: 'Pearl Overwater Bungalow',
+      stayImageUrl:
+          'https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1200',
+      destination: 'Bora Bora, French Polynesia',
+      checkIn: now.add(const Duration(days: 14)),
+      checkOut: now.add(const Duration(days: 19)),
+      guestCount: 2,
+      price: BookingPrice.calculate(
+        nightlyPriceCents: 58000,
+        nights: 5,
+        guests: 2,
+        addOnsTotalCents: 170000,
+      ),
+      status: BookingStatus.confirmed,
+      bookingReference: 'VYR-884920',
+      addOns: const [
+        BookingAddOn(
+          id: 'helicopter',
+          title: 'Airport Helicopter Transfer',
+          subtitle: 'Executive twin-engine scenic lagoon transfer',
+          priceCents: 125000,
+        ),
+        BookingAddOn(
+          id: 'champagne',
+          title: 'Dom Pérignon Vintage 2013',
+          subtitle: 'Chilled bottle with crystal flutes upon arrival',
+          priceCents: 45000,
+        ),
+      ],
+      specialRequests:
+          'Lagoon-facing overwater suite requested. Late anniversary arrival.',
+      cancellationPolicy: const CancellationPolicy(),
+      createdAt: now.subtract(const Duration(days: 5)),
+      updatedAt: now.subtract(const Duration(days: 5)),
+    );
+
+    // 2. Upcoming Luxury Stay: The Chedi Alpine Chalet in Zermatt & Alps
+    final b2 = Booking(
+      id: 'BK_SEED_2',
+      userId: userId,
+      stayId: 's016',
+      stayTitle: 'The Chedi Alpine Chalet',
+      stayImageUrl:
+          'https://images.unsplash.com/photo-1502784444187-359ac186c5bb?w=1200',
+      destination: 'Zermatt & Alps, Switzerland',
+      checkIn: now.add(const Duration(days: 45)),
+      checkOut: now.add(const Duration(days: 49)),
+      guestCount: 2,
+      price: BookingPrice.calculate(
+        nightlyPriceCents: 98000,
+        nights: 4,
+        guests: 2,
+        addOnsTotalCents: 60000,
+      ),
+      status: BookingStatus.confirmed,
+      bookingReference: 'VYR-771924',
+      addOns: const [
+        BookingAddOn(
+          id: 'butler',
+          title: 'Private Ski Concierge & Butler',
+          subtitle: 'Daily equipment fitting and heated boot preparation',
+          priceCents: 60000,
+        ),
+      ],
+      specialRequests: 'Wood-burning fireplace pre-lit before arrival.',
+      cancellationPolicy: const CancellationPolicy(),
+      createdAt: now.subtract(const Duration(days: 12)),
+      updatedAt: now.subtract(const Duration(days: 12)),
+    );
+
+    // 3. Completed Past Stay: The Ritz-Carlton Kyoto
+    final b3 = Booking(
+      id: 'BK_SEED_3',
+      userId: userId,
+      stayId: 's003',
+      stayTitle: 'The Ritz-Carlton Kyoto',
+      stayImageUrl:
+          'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1200',
+      destination: 'Kyoto, Japan',
+      checkIn: now.subtract(const Duration(days: 60)),
+      checkOut: now.subtract(const Duration(days: 56)),
+      guestCount: 2,
+      price: BookingPrice.calculate(
+        nightlyPriceCents: 82000,
+        nights: 4,
+        guests: 2,
+      ),
+      status: BookingStatus.completed,
+      bookingReference: 'VYR-491022',
+      createdAt: now.subtract(const Duration(days: 90)),
+      updatedAt: now.subtract(const Duration(days: 56)),
+    );
+
+    // 4. Completed Past Stay: Caldera Cliff Suite in Santorini
+    final b4 = Booking(
+      id: 'BK_SEED_4',
+      userId: userId,
+      stayId: 's005',
+      stayTitle: 'Caldera Cliff Suite',
+      stayImageUrl:
+          'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=1200',
+      destination: 'Santorini, Greece',
+      checkIn: now.subtract(const Duration(days: 120)),
+      checkOut: now.subtract(const Duration(days: 117)),
+      guestCount: 2,
+      price: BookingPrice.calculate(
+        nightlyPriceCents: 67000,
+        nights: 3,
+        guests: 2,
+      ),
+      status: BookingStatus.completed,
+      bookingReference: 'VYR-312984',
+      createdAt: now.subtract(const Duration(days: 150)),
+      updatedAt: now.subtract(const Duration(days: 117)),
+    );
+
+    // 5. Cancelled Stay (Full Refund Processed): Burj View Sky Suite
+    final priceDubai = BookingPrice.calculate(
+      nightlyPriceCents: 95000,
+      nights: 3,
+      guests: 2,
+    );
+    final b5 = Booking(
+      id: 'BK_SEED_5',
+      userId: userId,
+      stayId: 's009',
+      stayTitle: 'Burj View Sky Suite',
+      stayImageUrl:
+          'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1200',
+      destination: 'Dubai, UAE',
+      checkIn: now.add(const Duration(days: 8)),
+      checkOut: now.add(const Duration(days: 11)),
+      guestCount: 2,
+      price: priceDubai,
+      status: BookingStatus.cancelled,
+      bookingReference: 'VYR-109283',
+      refundStatus: RefundStatus.refunded,
+      refundAmountCents: priceDubai.totalCents,
+      createdAt: now.subtract(const Duration(days: 20)),
+      updatedAt: now.subtract(const Duration(days: 3)),
+    );
+
+    // 6. Cancelled Stay (Refund Pending Reconciliation): Château de Chambord Royal Estate
+    final priceFrance = BookingPrice.calculate(
+      nightlyPriceCents: 89000,
+      nights: 2,
+      guests: 2,
+    );
+    final b6 = Booking(
+      id: 'BK_SEED_6',
+      userId: userId,
+      stayId: 's012',
+      stayTitle: 'Château de Chambord Royal Estate',
+      stayImageUrl:
+          'https://images.unsplash.com/photo-1585543805890-6051f7829f98?w=1200',
+      destination: 'Loire & Riviera, France',
+      checkIn: now.add(const Duration(days: 25)),
+      checkOut: now.add(const Duration(days: 27)),
+      guestCount: 2,
+      price: priceFrance,
+      status: BookingStatus.cancelled,
+      bookingReference: 'VYR-554120',
+      refundStatus: RefundStatus.pending,
+      refundAmountCents: priceFrance.totalCents,
+      createdAt: now.subtract(const Duration(days: 7)),
+      updatedAt: now.subtract(const Duration(days: 1)),
+    );
+
+    _bookings[b1.id] = b1;
+    _bookings[b2.id] = b2;
+    _bookings[b3.id] = b3;
+    _bookings[b4.id] = b4;
+    _bookings[b5.id] = b5;
+    _bookings[b6.id] = b6;
+  }
 
   @override
   Stream<List<Booking>> streamBookings(String userId) {
     // Emit current state immediately then updates
-    Future.microtask(
-        () => _controller.add(_bookingsForUser(userId)));
+    Future.microtask(() => _controller.add(_bookingsForUser(userId)));
     return _controller.stream.map((_) => _bookingsForUser(userId));
   }
 

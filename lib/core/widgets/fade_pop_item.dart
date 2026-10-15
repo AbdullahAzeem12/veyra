@@ -82,3 +82,71 @@ class _FadePopItemState extends State<FadePopItem>
     );
   }
 }
+
+/// Dynamic viewport entrance pop-in and fade-in animation triggered smoothly
+/// as cards scroll into the viewport.
+class ScrollFadePopItem extends StatefulWidget {
+  final Widget child;
+  final Duration duration;
+  final double initialScale;
+  final Curve curve;
+
+  const ScrollFadePopItem({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 360),
+    this.initialScale = 0.93,
+    this.curve = Curves.easeOutCubic,
+  });
+
+  @override
+  State<ScrollFadePopItem> createState() => _ScrollFadePopItemState();
+}
+
+class _ScrollFadePopItemState extends State<ScrollFadePopItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scaleAnim;
+  late final Animation<double> _opacityAnim;
+  late final Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: widget.duration);
+
+    _scaleAnim = Tween<double>(begin: widget.initialScale, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
+    );
+
+    _opacityAnim = Tween<double>(begin: 0.15, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
+    );
+
+    _slideAnim = Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(
+      CurvedAnimation(parent: _ctrl, curve: widget.curve),
+    );
+
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacityAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}

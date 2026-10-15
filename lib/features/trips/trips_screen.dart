@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../core/theme/design_tokens.dart';
 import '../../core/widgets/shared_widgets.dart';
+import '../../core/widgets/fade_pop_item.dart';
 import '../../data/models/booking.dart';
 import '../../features/trips/booking_controller.dart';
 import '../../app.dart';
@@ -56,7 +57,7 @@ class _TripsBodyState extends State<_TripsBody>
         child: Column(
           children: [
             _TripsHeader(),
-            _TripsTabs(tabCtrl: _tabCtrl),
+            _TripsTabs(tabCtrl: _tabCtrl, ctrl: widget.ctrl),
             Expanded(
               child: TabBarView(
                 controller: _tabCtrl,
@@ -129,18 +130,61 @@ class _TripsHeader extends StatelessWidget {
 
 class _TripsTabs extends StatelessWidget {
   final TabController tabCtrl;
-  const _TripsTabs({required this.tabCtrl});
+  final BookingController ctrl;
+
+  const _TripsTabs({required this.tabCtrl, required this.ctrl});
 
   @override
   Widget build(BuildContext context) {
-    return TabBar(
-      controller: tabCtrl,
-      labelColor: Theme.of(context).colorScheme.primary,
-      tabs: const [
-        Tab(text: 'Upcoming'),
-        Tab(text: 'Completed'),
-        Tab(text: 'Cancelled'),
-      ],
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: VeyraTokens.spaceMD,
+        vertical: VeyraTokens.spaceXS,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? VeyraTokens.darkCardSurface : VeyraTokens.lightSurface,
+          borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+          border: Border.all(
+            color: isDark ? VeyraTokens.darkBorder : VeyraTokens.lightBorder,
+          ),
+          boxShadow: VeyraTokens.shadowSM,
+        ),
+        padding: const EdgeInsets.all(3),
+        child: TabBar(
+          controller: tabCtrl,
+          indicator: BoxDecoration(
+            color: scheme.primary,
+            borderRadius: BorderRadius.circular(VeyraTokens.radiusFull),
+            boxShadow: [
+              BoxShadow(
+                color: scheme.primary.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          labelColor: Colors.white,
+          unselectedLabelColor: isDark ? Colors.white60 : Colors.black54,
+          labelStyle: VeyraTokens.labelMedium.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: VeyraTokens.labelMedium.copyWith(
+            fontWeight: FontWeight.w500,
+            fontSize: 12,
+          ),
+          dividerColor: Colors.transparent,
+          tabs: [
+            Tab(text: 'Upcoming (${ctrl.upcomingBookings.length})'),
+            Tab(text: 'Completed (${ctrl.pastBookings.length})'),
+            Tab(text: 'Cancelled (${ctrl.cancelledBookings.length})'),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -171,8 +215,11 @@ class _TripsList extends StatelessWidget {
     }
     return ListView.builder(
       padding: const EdgeInsets.all(VeyraTokens.spaceMD),
+      physics: const BouncingScrollPhysics(),
       itemCount: bookings.length,
-      itemBuilder: (context, i) => _TripCard(booking: bookings[i], ctrl: ctrl),
+      itemBuilder: (context, i) => ScrollFadePopItem(
+        child: _TripCard(booking: bookings[i], ctrl: ctrl),
+      ),
     );
   }
 }
